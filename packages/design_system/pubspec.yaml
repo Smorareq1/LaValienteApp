@@ -1,0 +1,19 @@
+name: design_system
+description: Sistema de diseño atómico de La Valiente (tokens, átomos y moléculas).
+version: 1.0.0
+publish_to: none
+
+environment:
+  sdk: ^3.9.2
+  flutter: ">=3.35.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  google_fonts: ^6.2.1
+
+dev_dependencies:
+  flutter_lints: ^5.0.0
+
+flutter:
+  uses-material-design: true
