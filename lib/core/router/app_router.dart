@@ -4,7 +4,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../features/auth/state/auth_controller.dart';
+import '../../features/auth/ui/forgot_password_screen.dart';
 import '../../features/auth/ui/login_screen.dart';
+import '../../features/auth/ui/reset_password_screen.dart';
 import '../../features/auth/ui/splash_screen.dart';
 import '../../features/home/ui/home_screen.dart';
 
@@ -20,6 +22,13 @@ GoRouter appRouter(Ref ref) {
   ref.onDispose(refreshNotifier.dispose);
   ref.listen(authControllerProvider, (_, _) => refreshNotifier.value++);
 
+  // Rutas accesibles sin sesión (login y recuperación de contraseña).
+  const publicPaths = {
+    LoginScreen.path,
+    ForgotPasswordScreen.path,
+    ResetPasswordScreen.path,
+  };
+
   return GoRouter(
     initialLocation: SplashScreen.path,
     refreshListenable: refreshNotifier,
@@ -33,9 +42,9 @@ GoRouter appRouter(Ref ref) {
 
       final loggedIn = auth.valueOrNull != null;
       if (!loggedIn) {
-        return location == LoginScreen.path ? null : LoginScreen.path;
+        return publicPaths.contains(location) ? null : LoginScreen.path;
       }
-      if (location == LoginScreen.path || location == SplashScreen.path) {
+      if (publicPaths.contains(location) || location == SplashScreen.path) {
         return HomeScreen.path;
       }
       return null;
@@ -48,6 +57,15 @@ GoRouter appRouter(Ref ref) {
       GoRoute(
         path: LoginScreen.path,
         builder: (context, state) => const LoginScreen(),
+      ),
+      GoRoute(
+        path: ForgotPasswordScreen.path,
+        builder: (context, state) => const ForgotPasswordScreen(),
+      ),
+      GoRoute(
+        path: ResetPasswordScreen.path,
+        builder: (context, state) =>
+            ResetPasswordScreen(initialIdentifier: state.extra as String?),
       ),
       GoRoute(
         path: HomeScreen.path,

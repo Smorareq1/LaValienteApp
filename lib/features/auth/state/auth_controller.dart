@@ -19,12 +19,13 @@ class AuthController extends _$AuthController {
     return result.fold((_) => null, (user) => user);
   }
 
-  /// Intenta iniciar sesión. Devuelve el fallo para que la UI lo muestre,
-  /// o `null` si fue exitoso (el router redirige solo al cambiar el estado).
-  Future<AppFailure?> login({required String email, required String password}) async {
+  /// Intenta iniciar sesión con usuario o correo. Devuelve el fallo para que
+  /// la UI lo muestre, o `null` si fue exitoso (el router redirige solo al
+  /// cambiar el estado).
+  Future<AppFailure?> login({required String identifier, required String password}) async {
     final result = await ref
         .read(authRepositoryProvider)
-        .login(email: email, password: password);
+        .login(identifier: identifier, password: password);
     return result.fold(
       (failure) => failure,
       (user) {

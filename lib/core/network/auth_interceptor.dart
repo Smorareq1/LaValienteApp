@@ -18,7 +18,12 @@ class AuthInterceptor extends QueuedInterceptor {
   final SecureStorageService _storage;
   final Dio _dio;
 
-  static const Set<String> _publicPaths = {'/auth/login', '/auth/refresh', '/auth/register'};
+  static const Set<String> _publicPaths = {
+    '/auth/login',
+    '/auth/refresh',
+    '/auth/forgot-password',
+    '/auth/reset-password',
+  };
 
   bool _isPublic(RequestOptions options) => _publicPaths.contains(options.path);
 

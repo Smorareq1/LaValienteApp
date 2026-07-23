@@ -1,9 +1,11 @@
 import 'package:design_system/design_system.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../core/errors/app_failure.dart';
 import '../state/auth_controller.dart';
+import 'forgot_password_screen.dart';
 import 'widgets/auth_header.dart';
 
 /// Pantalla de inicio de sesión — screen 06 del design system.
@@ -17,36 +19,30 @@ class LoginScreen extends ConsumerStatefulWidget {
 }
 
 class _LoginScreenState extends ConsumerState<LoginScreen> {
-  final _emailController = TextEditingController();
+  final _identifierController = TextEditingController();
   final _passwordController = TextEditingController();
 
   bool _submitting = false;
-  String? _emailError;
+  String? _identifierError;
   String? _passwordError;
   String? _formError;
 
-  static final _emailRegex = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$');
-
   @override
   void dispose() {
-    _emailController.dispose();
+    _identifierController.dispose();
     _passwordController.dispose();
     super.dispose();
   }
 
   bool _validate() {
-    final email = _emailController.text.trim();
+    final identifier = _identifierController.text.trim();
     final password = _passwordController.text;
     setState(() {
-      _emailError = email.isEmpty
-          ? 'Ingresá tu correo'
-          : !_emailRegex.hasMatch(email)
-              ? 'Ingresá un correo válido'
-              : null;
+      _identifierError = identifier.isEmpty ? 'Ingresá tu usuario o correo' : null;
       _passwordError = password.isEmpty ? 'Ingresá tu contraseña' : null;
       _formError = null;
     });
-    return _emailError == null && _passwordError == null;
+    return _identifierError == null && _passwordError == null;
   }
 
   Future<void> _submit() async {
@@ -54,7 +50,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     setState(() => _submitting = true);
 
     final failure = await ref.read(authControllerProvider.notifier).login(
-          email: _emailController.text.trim(),
+          identifier: _identifierController.text.trim(),
           password: _passwordController.text,
         );
 
@@ -63,7 +59,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       _submitting = false;
       _formError = switch (failure) {
         null => null,
-        AuthFailure() => 'Correo o contraseña incorrectos',
+        AuthFailure() => 'Usuario o contraseña incorrectos',
         NetworkFailure() => 'Sin conexión con el servidor. Verificá tu red.',
         ValidationFailure(:final message) => message,
         _ => 'Algo salió mal. Intentá de nuevo.',
@@ -90,15 +86,15 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     AppFormField(
-                      label: 'Correo electrónico',
-                      controller: _emailController,
-                      hintText: 'usuario@lavaliente.gt',
-                      errorText: _emailError,
+                      label: 'Usuario o correo',
+                      controller: _identifierController,
+                      hintText: 'sebasm',
+                      errorText: _identifierError,
                       enabled: !_submitting,
                       prefixIcon: const Icon(Icons.person_outline),
-                      keyboardType: TextInputType.emailAddress,
+                      keyboardType: TextInputType.text,
                       textInputAction: TextInputAction.next,
-                      autofillHints: const [AutofillHints.email],
+                      autofillHints: const [AutofillHints.username],
                     ),
                     const SizedBox(height: AppSpacing.md),
                     AppFormField(
@@ -114,17 +110,20 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       onSubmitted: (_) => _submit(),
                     ),
                     const SizedBox(height: AppSpacing.sm),
-                    Row(
-                      children: [
-                        const Icon(Icons.info_outline, size: 14, color: AppColors.gray400),
-                        const SizedBox(width: 6),
-                        Expanded(
-                          child: Text(
-                            '¿Problemas para entrar? Contactá al administrador',
-                            style: AppTypography.helper,
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: TextButton(
+                        onPressed: _submitting
+                            ? null
+                            : () => context.push(ForgotPasswordScreen.path),
+                        child: Text(
+                          '¿Olvidaste tu contraseña?',
+                          style: AppTypography.bodySm.copyWith(
+                            color: AppColors.primary600,
+                            fontWeight: FontWeight.w600,
                           ),
                         ),
-                      ],
+                      ),
                     ),
                     if (_formError != null) ...[
                       const SizedBox(height: AppSpacing.md),

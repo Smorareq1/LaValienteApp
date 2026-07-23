@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../auth/state/auth_controller.dart';
+import '../../auth/ui/widgets/permission_gate.dart';
 
 /// Pantalla principal (placeholder): confirma la sesión activa y permite
 /// cerrar sesión mientras se construyen los módulos reales.
@@ -54,7 +55,9 @@ class HomeScreen extends ConsumerWidget {
                       ),
                     ),
                     AppAvatar(
-                      initials: user?.email.substring(0, 2).toUpperCase() ?? '··',
+                      initials: (user != null && user.username.length >= 2)
+                          ? user.username.substring(0, 2).toUpperCase()
+                          : '··',
                       style: AppAvatarStyle.brand,
                     ),
                   ],
@@ -73,7 +76,7 @@ class HomeScreen extends ConsumerWidget {
                     Text('Sesión iniciada', style: AppTypography.h3),
                     const SizedBox(height: AppSpacing.xs),
                     Text(
-                      user?.email ?? '',
+                      user?.displayName ?? '',
                       style: AppTypography.bodySm
                           .copyWith(color: AppColors.textSecondary),
                     ),
@@ -97,6 +100,42 @@ class HomeScreen extends ConsumerWidget {
                           ref.read(authControllerProvider.notifier).logout(),
                     ),
                   ],
+                ),
+              ),
+              // Ejemplo del patrón de gating: este módulo solo se renderiza
+              // para usuarios con permisos de administración.
+              PermissionGate(
+                anyOf: const [
+                  'authorization.users.manage',
+                  'authorization.roles.manage',
+                ],
+                child: Container(
+                  margin: const EdgeInsets.only(top: AppSpacing.lg),
+                  padding: const EdgeInsets.all(AppSpacing.lg),
+                  decoration: BoxDecoration(
+                    color: AppColors.surface,
+                    borderRadius: AppRadius.lgAll,
+                    border: Border.all(color: AppColors.border),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.admin_panel_settings_outlined,
+                          color: AppColors.primary500),
+                      const SizedBox(width: AppSpacing.sm),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('Administración', style: AppTypography.label),
+                            Text(
+                              'Usuarios, roles y permisos',
+                              style: AppTypography.helper,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ],

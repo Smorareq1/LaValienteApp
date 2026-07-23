@@ -17,13 +17,14 @@ class AuthRepository {
   final AuthRemoteDataSource _remote;
   final SecureStorageService _storage;
 
-  /// Inicia sesión, persiste los tokens y devuelve el usuario actual.
+  /// Inicia sesión (por usuario o correo), persiste los tokens y devuelve el
+  /// usuario actual.
   Future<Either<AppFailure, AuthUser>> login({
-    required String email,
+    required String identifier,
     required String password,
   }) async {
     try {
-      final tokens = await _remote.login(email: email, password: password);
+      final tokens = await _remote.login(identifier: identifier, password: password);
       await _storage.saveTokens(
         accessToken: tokens.accessToken,
         refreshToken: tokens.refreshToken,
@@ -49,6 +50,34 @@ class AuthRepository {
         return right(null);
       }
       return left(failure);
+    }
+  }
+
+  /// Pide el envío de un código de recuperación de contraseña.
+  Future<Either<AppFailure, Unit>> requestPasswordReset({required String identifier}) async {
+    try {
+      await _remote.forgotPassword(identifier: identifier);
+      return right(unit);
+    } catch (error) {
+      return left(AppFailure.fromException(error));
+    }
+  }
+
+  /// Canjea el código recibido por una nueva contraseña.
+  Future<Either<AppFailure, Unit>> resetPassword({
+    required String identifier,
+    required String code,
+    required String newPassword,
+  }) async {
+    try {
+      await _remote.resetPassword(
+        identifier: identifier,
+        code: code,
+        newPassword: newPassword,
+      );
+      return right(unit);
+    } catch (error) {
+      return left(AppFailure.fromException(error));
     }
   }
 
