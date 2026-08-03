@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
@@ -13,6 +15,7 @@ class SecureStorageService {
 
   static const String _kAccessToken = 'auth.access_token';
   static const String _kRefreshToken = 'auth.refresh_token';
+  static const String _kDatabaseKey = 'database.cipher_key';
 
   Future<String?> readAccessToken() => _storage.read(key: _kAccessToken);
 
@@ -32,6 +35,36 @@ class SecureStorageService {
   }
 
   Future<bool> hasSession() async => await readRefreshToken() != null;
+
+  /// Llave de cifrado de la base de datos local (plan 0004 D12).
+  ///
+  /// 256 bits en hexadecimal, generados una sola vez por instalación. Nunca
+  /// sale del almacenamiento seguro del sistema operativo ni viaja al
+  /// servidor: si el dispositivo se pierde, la BD es un archivo ilegible.
+  Future<String> databaseKey() async {
+    final existing = await _storage.read(key: _kDatabaseKey);
+    if (existing != null) return existing;
+
+    final key = _generateDatabaseKey();
+    await _storage.write(key: _kDatabaseKey, value: key);
+    return key;
+  }
+
+  /// Genera y guarda una llave nueva, devolviéndola.
+  ///
+  /// La usa el wipe por revocación (D11): re-cifrar la BD con una llave nueva
+  /// deja ilegible cualquier resto de las páginas viejas del archivo.
+  Future<String> rotateDatabaseKey() async {
+    final key = _generateDatabaseKey();
+    await _storage.write(key: _kDatabaseKey, value: key);
+    return key;
+  }
+
+  static String _generateDatabaseKey() {
+    final random = Random.secure();
+    final bytes = List<int>.generate(32, (_) => random.nextInt(256));
+    return bytes.map((byte) => byte.toRadixString(16).padLeft(2, '0')).join();
+  }
 }
 
 @Riverpod(keepAlive: true)

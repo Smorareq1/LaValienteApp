@@ -17,6 +17,9 @@ class AppFormField extends StatelessWidget {
     this.obscureText = false,
     this.showObscureToggle = false,
     this.prefixIcon,
+    this.suffix,
+    this.maxLines = 1,
+    this.optional = false,
     this.keyboardType,
     this.textInputAction,
     this.autofillHints,
@@ -33,6 +36,13 @@ class AppFormField extends StatelessWidget {
   final bool obscureText;
   final bool showObscureToggle;
   final Widget? prefixIcon;
+  final Widget? suffix;
+  final int maxLines;
+
+  /// Añade "· opcional" a la etiqueta. Marcar lo opcional en vez de lo
+  /// obligatorio deja los formularios largos con menos ruido.
+  final bool optional;
+
   final TextInputType? keyboardType;
   final TextInputAction? textInputAction;
   final Iterable<String>? autofillHints;
@@ -44,7 +54,21 @@ class AppFormField extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: AppTypography.label),
+        if (optional)
+          Text.rich(
+            TextSpan(
+              text: label,
+              children: [
+                TextSpan(
+                  text: ' · opcional',
+                  style: AppTypography.helper.copyWith(fontSize: 11),
+                ),
+              ],
+            ),
+            style: AppTypography.label,
+          )
+        else
+          Text(label, style: AppTypography.label),
         const SizedBox(height: 7),
         AppTextField(
           controller: controller,
@@ -54,6 +78,8 @@ class AppFormField extends StatelessWidget {
           obscureText: obscureText,
           showObscureToggle: showObscureToggle,
           prefixIcon: prefixIcon,
+          suffix: suffix,
+          maxLines: maxLines,
           keyboardType: keyboardType,
           textInputAction: textInputAction,
           autofillHints: autofillHints,

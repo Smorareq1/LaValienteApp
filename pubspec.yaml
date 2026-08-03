@@ -28,11 +28,16 @@ dependencies:
 
   # Persistencia
   drift: ^2.28.0
-  drift_flutter: ^0.2.7
   flutter_secure_storage: ^9.2.4
 
   # Operaciones funcionales
   fpdart: ^1.1.1
+  sqlcipher_flutter_libs: ^0.6.8
+  path_provider: ^2.1.5
+  path: ^1.9.1
+  uuid: ^4.6.0
+  connectivity_plus: ^7.3.1
+  sqlite3: ^2.9.4
 
 dev_dependencies:
   flutter_test:
@@ -43,6 +48,8 @@ dev_dependencies:
   build_runner: ^2.4.15
   riverpod_generator: ^2.6.3
   drift_dev: ^2.28.0
+  integration_test:
+    sdk: flutter
 
 flutter:
   uses-material-design: true

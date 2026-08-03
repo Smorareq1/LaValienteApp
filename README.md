@@ -7,7 +7,7 @@ App de gestión para la lavandería **La Valiente · Cobán**, construida con Fl
 - **UI:** Flutter + GoRouter (auth guard reactivo)
 - **Estado:** Riverpod con codegen (`riverpod_generator`)
 - **Red:** Dio con interceptor de autenticación (bearer + refresh automático en 401)
-- **Persistencia:** Drift (SQLite) y `flutter_secure_storage` para tokens
+- **Persistencia:** Drift sobre **SQLite cifrado con SQLCipher** (llave por dispositivo en `flutter_secure_storage`, plan 0004 D12)
 - **Errores:** `fpdart` con `Either<AppFailure, T>`
 - **Design system:** paquete interno [`packages/design_system`](packages/design_system) bajo diseño atómico (tokens → átomos → moléculas)
 
@@ -22,6 +22,27 @@ lib/
 packages/
   design_system/  # tokens, átomos y moléculas — 100% independiente
 ```
+
+## Datos: todo sale de la base local
+
+La UI **nunca** espera a la red (plan 0004 D1). Lee y escribe SQLite, y el motor de
+sincronización reconcilia por detrás:
+
+- `features/catalog` y `features/customers` leen sus tablas espejo, que llena el feed.
+- Las pantallas de Clientes (lista, detalle y formulario) operan enteras contra esas
+  tablas: buscar, dar de alta, editar y archivar funcionan sin señal.
+- Capturar un cliente escribe la fila y encola su operación en una sola transacción; la
+  fila queda `pending` hasta que el servidor responde.
+- Sumar una entidad al espejo es registrar un `SyncEntityMirror` en `syncMirrorsProvider`;
+  lo que llegó antes de que existiera está en `deferred_changes` y entra solo.
+
+## Permisos: se oculta, no se deshabilita
+
+Las secciones que un rol no puede usar **no se dibujan** (plan 0006 §13): la barra
+inferior, el hub "Más" y las cards de Inicio consultan `AuthUser.hasPermission`, y el
+router repite el chequeo por si alguien entra por deep link. Los roles `admin` y
+`system_admin` llevan el comodín `*.*` y ven todo; un `deny` por usuario le gana al
+comodín, con la misma regla que aplica el backend.
 
 ## Desarrollo
 
@@ -38,3 +59,36 @@ La app apunta al backend en `http://localhost:8000` (`/api/v1`). Para cambiarlo:
 ```bash
 flutter run --dart-define=API_BASE_URL=http://10.0.2.2:8000   # emulador Android
 ```
+
+> La app es **native-only**: el opener de la BD usa `dart:io`, `path_provider` y
+> SQLCipher, así que no compila para web. No vuelvas a agregar `drift_flutter`:
+> su `sqlite3_flutter_libs` declara la misma clase de plugin Android que
+> `sqlcipher_flutter_libs` y rompe el dex merge.
+
+## Pruebas
+
+```bash
+flutter test          # unitarias y de widget — no necesitan dispositivo
+```
+
+Las de `integration_test/` corren la app real sobre un dispositivo o emulador,
+que es la única forma de comprobar lo que depende de la plataforma:
+
+```bash
+# 1. Emulador headless
+"$LOCALAPPDATA/Android/Sdk/emulator/emulator" -avd Medium_Phone_API_35 -no-window -no-audio
+
+# 2. Que la BD abra con SQLCipher y quede ilegible en disco
+flutter test integration_test/encrypted_database_test.dart -d emulator-5554
+```
+
+El ciclo de sincronización necesita además el backend levantado y un usuario de
+pruebas (ver `BACKEND/README.md`):
+
+```bash
+flutter test integration_test/sync_cycle_test.dart -d emulator-5554 \
+  --dart-define=API_BASE_URL=http://10.0.2.2:8000 \
+  --dart-define=E2E_USER=e2e_tester --dart-define=E2E_PASSWORD=...
+```
+
+En el emulador de Android, `10.0.2.2` es el `localhost` de la máquina anfitriona.
