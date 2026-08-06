@@ -45,6 +45,25 @@ final pendingOperationsCountProvider = StreamProvider<int>.internal(
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
 typedef PendingOperationsCountRef = StreamProviderRef<int>;
+String _$pendingByEntityHash() => r'7c6eb0ba0f6d557d0ffeed2cabb5e6f50fedfa34';
+
+/// Lo que espera subir, desglosado por entidad (§11.1).
+///
+/// Copied from [pendingByEntity].
+@ProviderFor(pendingByEntity)
+final pendingByEntityProvider = StreamProvider<Map<String, int>>.internal(
+  pendingByEntity,
+  name: r'pendingByEntityProvider',
+  debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
+      ? null
+      : _$pendingByEntityHash,
+  dependencies: null,
+  allTransitiveDependencies: null,
+);
+
+@Deprecated('Will be removed in 3.0. Use Ref instead')
+// ignore: unused_element
+typedef PendingByEntityRef = StreamProviderRef<Map<String, int>>;
 String _$reviewQueueCountHash() => r'10925bf0082de37e5fa33352c321a9e679250065';
 
 /// Capturas que el servidor rechazó y esperan una decisión humana (§8).

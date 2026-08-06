@@ -6,7 +6,7 @@ part of 'app_router.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$appRouterHash() => r'9a9bdd20d41b423dfaa9cecd84ffe0e6ef6585ac';
+String _$appRouterHash() => r'4dfc9e98f5ab4ad3d289ee94fc0bc4bc0b2daeaa';
 
 /// Router de la app con auth guard reactivo:
 /// - Mientras se restaura la sesión → splash.

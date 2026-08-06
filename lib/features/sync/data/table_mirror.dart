@@ -62,6 +62,22 @@ abstract class TableMirror<D extends DataClass> implements SyncEntityMirror {
     );
   }
 
+  @override
+  Future<void> discard(String entityId) async {
+    // Lápida y no `DELETE`: una pantalla abierta puede estar mirando esta fila
+    // en este momento, y todos los lectores del espejo ya filtran los
+    // tombstones. Marcarla es una escritura que nadie tiene que aprender.
+    await database.customUpdate(
+      'UPDATE ${table.actualTableName} SET deleted_at = ?, sync_status = ? WHERE id = ?',
+      variables: [
+        Variable<DateTime>(DateTime.now()),
+        Variable<String>(RowSyncStatus.synced.name),
+        Variable<String>(entityId),
+      ],
+      updates: {table},
+    );
+  }
+
   Future<bool> _isPending(String id) async {
     final rows = await database
         .customSelect(

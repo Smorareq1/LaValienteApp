@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../tokens/app_colors.dart';
 import '../tokens/app_radius.dart';
@@ -23,6 +24,7 @@ class AppTextField extends StatefulWidget {
     this.keyboardType,
     this.textInputAction,
     this.autofillHints,
+    this.inputFormatters,
     this.onChanged,
     this.onSubmitted,
   });
@@ -47,6 +49,11 @@ class AppTextField extends StatefulWidget {
   final TextInputType? keyboardType;
   final TextInputAction? textInputAction;
   final Iterable<String>? autofillHints;
+
+  /// Filtra lo que se puede teclear. Impedir un carácter que después habría que
+  /// rechazar con un mensaje sale más barato que el mensaje.
+  final List<TextInputFormatter>? inputFormatters;
+
   final ValueChanged<String>? onChanged;
   final ValueChanged<String>? onSubmitted;
 
@@ -133,6 +140,7 @@ class _AppTextFieldState extends State<AppTextField> {
               keyboardType: widget.keyboardType,
               textInputAction: widget.textInputAction,
               autofillHints: widget.autofillHints,
+              inputFormatters: widget.inputFormatters,
               onChanged: widget.onChanged,
               onSubmitted: widget.onSubmitted,
               style: AppTypography.bodySm.copyWith(
@@ -175,3 +183,10 @@ class _AppTextFieldState extends State<AppTextField> {
     );
   }
 }
+
+/// Deja teclear solo lo que un campo de dos decimales sabe leer: dígitos y un
+/// separador decimal. Es más barato impedir la coma de miles que explicarla
+/// después con un mensaje de error.
+final List<TextInputFormatter> decimalInputFormatters = [
+  FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
+];

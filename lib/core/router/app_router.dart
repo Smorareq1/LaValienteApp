@@ -13,8 +13,16 @@ import '../../features/customers/ui/customer_detail_screen.dart';
 import '../../features/customers/ui/customers_screen.dart';
 import '../../features/home/ui/home_screen.dart';
 import '../../features/more/ui/more_screen.dart';
+import '../../features/orders/models/order.dart';
+import '../../features/orders/ui/order_capture_screen.dart';
+import '../../features/orders/ui/order_detail_screen.dart';
+import '../../features/orders/ui/order_deliver_screen.dart';
+import '../../features/orders/ui/orders_screen.dart';
+import '../../features/promotions/ui/promotions_screen.dart';
 import '../../features/shell/ui/app_shell.dart';
 import '../../features/shell/ui/module_placeholder_screen.dart';
+import '../../features/sync/ui/review_detail_screen.dart';
+import '../../features/sync/ui/review_queue_screen.dart';
 import '../../features/sync/ui/sync_screen.dart';
 import '../auth/app_permissions.dart';
 
@@ -30,6 +38,8 @@ final _rootNavigatorKey = GlobalKey<NavigatorState>();
 /// toparse con la misma puerta.
 const Map<String, List<String>> _routePermissions = {
   '/orders': [AppPermissions.ordersRead],
+  // Se evalúa además del de `/orders`: tomar un pedido supone poder verlos.
+  OrderCaptureScreen.path: [AppPermissions.ordersCreate],
   '/customers': [AppPermissions.customersRead],
   '/cash': [AppPermissions.expensesRead],
   '/cash/history': [AppPermissions.dailyCloseRead],
@@ -46,7 +56,6 @@ final List<RouteBase> _pendingModules = [
   for (final module in const [
     (path: '/inventory', title: 'Insumos', icon: Icons.inventory_2_outlined, phase: 'UI 7'),
     (path: '/staff', title: 'Personal', icon: Icons.badge_outlined, phase: 'UI 7'),
-    (path: '/promotions', title: 'Promociones', icon: Icons.local_offer_outlined, phase: 'UI 5'),
     (path: '/catalog', title: 'Catálogo', icon: Icons.sell_outlined, phase: 'UI 10'),
     (
       path: '/cash/history',
@@ -130,6 +139,51 @@ GoRouter appRouter(Ref ref) {
         path: SyncScreen.path,
         builder: (context, state) => const SyncScreen(),
       ),
+      // La cola de revisión se alcanza desde el banner de Inicio, desde el
+      // indicador del AppBar y desde la propia pantalla de sincronización. Van
+      // planas y no anidadas bajo `/sync` porque se llega a ellas desde
+      // cualquier parte de la app, no bajando por un módulo.
+      //
+      // Solo piden sesión (§3.2): un colaborador tiene que poder resolver sus
+      // propias capturas, y el RBAC del servidor sigue decidiendo qué se aplica.
+      GoRoute(
+        path: ReviewQueueScreen.path,
+        builder: (context, state) => const ReviewQueueScreen(),
+      ),
+      GoRoute(
+        path: ReviewDetailScreen.path,
+        builder: (context, state) =>
+            ReviewDetailScreen(opId: state.pathParameters['opId']!),
+      ),
+      // La toma de pedido también vive fuera del shell: ocupa la pantalla
+      // completa y su footer de total va pegado abajo, donde estaría la barra
+      // de navegación. Se llega desde Inicio y desde la lista de Pedidos, y se
+      // sale con la flecha o al guardar.
+      //
+      // Va **antes** del shell a propósito: dentro de la rama de Pedidos vive
+      // `/orders/:id`, que también casaría con "new". Gana la primera que
+      // coincide, y esta se declara primero.
+      GoRoute(
+        path: OrderCaptureScreen.path,
+        builder: (context, state) => const OrderCaptureScreen(),
+      ),
+      // Corregir una boleta es la misma pantalla precargada (plan 0001 §7.3),
+      // así que vive donde ella: fuera del shell, porque el footer del total
+      // ocupa el sitio de la barra de navegación. El permiso lo aplica el botón
+      // del detalle —que distingue un pedido listo de uno en proceso— y el RBAC
+      // del servidor al aplicar la operación, que es donde el plan 0004 §10
+      // dice que se evalúa.
+      GoRoute(
+        path: '/orders/:id/edit',
+        builder: (context, state) =>
+            OrderCaptureScreen(orderId: state.pathParameters['id']),
+      ),
+      // Administrar promociones también se apila sobre el shell: se llega desde
+      // "Más", es cosa de admin y no uno de los cinco destinos del mostrador.
+      GoRoute(
+        path: PromotionsScreen.path,
+        builder: (context, state) => const PromotionsScreen(),
+      ),
       // Los módulos del hub "Más". Existen desde ya, aunque sea como marcador,
       // porque el hub los ofrece: una entrada visible que cae en la pantalla de
       // ruta desconocida se lee como una app rota, no como una fase pendiente.
@@ -150,12 +204,27 @@ GoRouter appRouter(Ref ref) {
           StatefulShellBranch(
             routes: [
               GoRoute(
-                path: '/orders',
-                builder: (context, state) => const ModulePlaceholderScreen(
-                  title: 'Pedidos',
-                  icon: Icons.local_mall_outlined,
-                  phase: 'UI 4',
+                path: OrdersScreen.path,
+                builder: (context, state) => OrdersScreen(
+                  // Los contadores de Inicio abren la lista ya filtrada.
+                  initialStatus: _statusFromExtra(state.extra),
                 ),
+                routes: [
+                  // Hijas de la rama: la barra inferior sigue ahí y volver
+                  // regresa a la lista con el día y los filtros intactos.
+                  GoRoute(
+                    path: ':id',
+                    builder: (context, state) =>
+                        OrderDetailScreen(orderId: state.pathParameters['id']!),
+                    routes: [
+                      GoRoute(
+                        path: 'deliver',
+                        builder: (context, state) =>
+                            OrderDeliverScreen(orderId: state.pathParameters['id']!),
+                      ),
+                    ],
+                  ),
+                ],
               ),
             ],
           ),
@@ -202,6 +271,17 @@ GoRouter appRouter(Ref ref) {
       ),
     ],
   );
+}
+
+/// El estado con el que Inicio pide abrir la lista, si mandó alguno.
+///
+/// Viaja como `extra` y no en la ruta porque es una preferencia de apertura, no
+/// una dirección: `/orders` filtrado por "listos" y `/orders` son la misma
+/// pantalla, y un enlace guardado no debería congelar un filtro.
+OrderStatus? _statusFromExtra(Object? extra) {
+  if (extra is! Map) return null;
+  final status = extra['status'];
+  return status is String ? OrderStatus.fromWire(status) : null;
 }
 
 /// Comprueba el permiso mínimo de [location] contra los permisos de [user].

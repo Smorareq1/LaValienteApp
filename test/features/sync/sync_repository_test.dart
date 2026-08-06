@@ -125,6 +125,7 @@ class _RecordingMirror implements SyncEntityMirror {
   final List<String> applied = [];
   final List<String> settled = [];
   final List<String> rejected = [];
+  final List<String> discarded = [];
 
   @override
   String get entity => 'customer';
@@ -140,6 +141,9 @@ class _RecordingMirror implements SyncEntityMirror {
     settled.add(entityId);
     if (rejected) this.rejected.add(entityId);
   }
+
+  @override
+  Future<void> discard(String entityId) async => discarded.add(entityId);
 }
 
 SyncChange _change(String id, {int syncSeq = 1, String entity = 'customer'}) {

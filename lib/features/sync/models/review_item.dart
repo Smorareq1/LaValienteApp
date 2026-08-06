@@ -1,0 +1,235 @@
+/// Un dato suelto de la comparación de §11.2: etiqueta y valor ya legibles.
+class ReviewFact {
+  const ReviewFact(this.label, this.value);
+
+  final String label;
+  final String value;
+}
+
+/// Cómo terminó la operación según el servidor.
+///
+/// Los dos van a la misma cola porque los dos necesitan a alguien, pero no son
+/// lo mismo: uno es una regla de negocio que no se cumplió, el otro una carrera
+/// entre dos dispositivos que nadie puede resolver adivinando (D6).
+enum ReviewOutcome {
+  /// Una regla de dominio o un permiso la rechazaron.
+  rejected,
+
+  /// Otro dispositivo ya había cambiado la fila.
+  conflict;
+
+  static ReviewOutcome fromWire(String value) => switch (value) {
+    'conflict' => ReviewOutcome.conflict,
+    _ => ReviewOutcome.rejected,
+  };
+
+  String get label => switch (this) {
+    ReviewOutcome.rejected => 'Rechazada',
+    ReviewOutcome.conflict => 'Chocó',
+  };
+}
+
+/// Qué se estaba intentando hacer, que es lo que decide qué se puede hacer
+/// ahora.
+///
+/// Se clasifica por `entity` + `op_type` y no por el texto del motivo: el
+/// servidor contesta en prosa y libre, y colgar las acciones de una frase que
+/// mañana se puede reescribir sería construir sobre arena.
+enum ReviewKind {
+  orderCreate,
+  orderUpdate,
+  orderStatus,
+  orderDeliver,
+  orderCancel,
+  paymentCreate,
+  customerCreate,
+  customerUpdate,
+  customerArchive,
+  unknown;
+
+  static ReviewKind fromOperation(String entity, String opType) =>
+      switch ((entity, opType)) {
+        ('order', 'create') => ReviewKind.orderCreate,
+        ('order', 'update') => ReviewKind.orderUpdate,
+        ('order', 'status') => ReviewKind.orderStatus,
+        ('order', 'deliver') => ReviewKind.orderDeliver,
+        ('order', 'cancel') => ReviewKind.orderCancel,
+        ('order_payment', 'create') => ReviewKind.paymentCreate,
+        ('customer', 'create') => ReviewKind.customerCreate,
+        ('customer', 'update') => ReviewKind.customerUpdate,
+        ('customer', 'archive') => ReviewKind.customerArchive,
+        _ => ReviewKind.unknown,
+      };
+
+  /// Titular de la tarjeta: qué se intentó, en el lenguaje del mostrador.
+  String get title => switch (this) {
+    ReviewKind.orderCreate => 'Boleta nueva',
+    ReviewKind.orderUpdate => 'Corrección de boleta',
+    ReviewKind.orderStatus => 'Cambio de estado',
+    ReviewKind.orderDeliver => 'Entrega',
+    ReviewKind.orderCancel => 'Anulación',
+    ReviewKind.paymentCreate => 'Cobro',
+    ReviewKind.customerCreate => 'Cliente nuevo',
+    ReviewKind.customerUpdate => 'Datos de un cliente',
+    ReviewKind.customerArchive => 'Archivar un cliente',
+    ReviewKind.unknown => 'Operación',
+  };
+
+  /// La captura creó algo que el servidor nunca llegó a tener.
+  ///
+  /// Es la línea que separa descartar de olvidar: si la operación era un alta,
+  /// descartarla tiene que retirar también la fila local, porque nadie más la
+  /// va a corregir — el feed no puede traer lo que no existe. En todo lo demás
+  /// el servidor ya tiene la verdad y basta con cerrar la entrada.
+  bool get createsLocalRow =>
+      this == ReviewKind.orderCreate ||
+      this == ReviewKind.paymentCreate ||
+      this == ReviewKind.customerCreate;
+}
+
+/// Una captura que el servidor no aceptó y espera una decisión humana
+/// (plan 0004 §8, plan 0006 §11.2).
+///
+/// El motor no descarta nada por su cuenta: lo que no se pudo aplicar queda
+/// aquí con lo que se capturó y lo que el servidor respondió, para que una
+/// persona decida con las dos versiones a la vista.
+class ReviewItem {
+  const ReviewItem({
+    required this.opId,
+    required this.entity,
+    required this.opType,
+    required this.entityId,
+    required this.outcome,
+    required this.localPayload,
+    required this.createdAt,
+    this.reason,
+    this.serverData,
+    this.serverVersion,
+  });
+
+  final String opId;
+  final String entity;
+  final String opType;
+
+  /// El id que este dispositivo le dio a la entidad (D3).
+  final String entityId;
+
+  final ReviewOutcome outcome;
+
+  /// El motivo tal como lo escribió el servidor. Se muestra literal y aparte:
+  /// es un dato de diagnóstico, no la explicación que lee el mostrador.
+  final String? reason;
+
+  /// El comando que se capturó aquí.
+  final Map<String, dynamic> localPayload;
+
+  /// El estado que tiene el servidor, cuando lo mandó.
+  final Map<String, dynamic>? serverData;
+
+  final int? serverVersion;
+  final DateTime createdAt;
+
+  ReviewKind get kind => ReviewKind.fromOperation(entity, opType);
+
+  /// El pedido al que apunta la operación, si apunta a alguno. Un cobro no lo
+  /// nombra con su `entity_id` —ese es el id del pago— sino dentro del cuerpo.
+  String? get orderId => switch (kind) {
+    ReviewKind.orderCreate ||
+    ReviewKind.orderUpdate ||
+    ReviewKind.orderStatus ||
+    ReviewKind.orderDeliver ||
+    ReviewKind.orderCancel => entityId,
+    ReviewKind.paymentCreate => localPayload['order_id'] as String?,
+    _ => null,
+  };
+
+  String? get customerId => switch (kind) {
+    ReviewKind.customerCreate ||
+    ReviewKind.customerUpdate ||
+    ReviewKind.customerArchive => entityId,
+    _ => null,
+  };
+
+  /// La serie de imprenta de la boleta, que es como el mostrador llama a un
+  /// pedido que todavía no tiene número del día.
+  String? get bookletSerial => localPayload['booklet_serial'] as String?;
+
+  /// Una línea que identifique la captura sin abrirla.
+  String get subtitle => switch (kind) {
+    ReviewKind.orderCreate || ReviewKind.orderUpdate =>
+      bookletSerial == null ? 'Sin serie de boleta' : 'Boleta $bookletSerial',
+    ReviewKind.orderStatus => 'Pasar a ${_statusLabel(localPayload['status'])}',
+    ReviewKind.orderDeliver => 'Entregar la ropa al cliente',
+    ReviewKind.orderCancel => 'Motivo: ${localPayload['reason'] ?? '—'}',
+    ReviewKind.paymentCreate => 'Q${localPayload['amount'] ?? '0.00'}',
+    ReviewKind.customerCreate ||
+    ReviewKind.customerUpdate => (localPayload['full_name'] as String?) ?? '—',
+    ReviewKind.customerArchive => 'Sacarlo de la lista',
+    ReviewKind.unknown => '$entity · $opType',
+  };
+
+  /// Lo capturado, en las palabras de la boleta.
+  ///
+  /// Sale del payload y no del espejo local a propósito: el espejo ya lo pisó
+  /// el feed —una fila rechazada deja de estar protegida—, así que esto es lo
+  /// único que queda de lo que la persona realmente escribió.
+  List<ReviewFact> get capturedFacts => switch (kind) {
+    ReviewKind.orderCreate || ReviewKind.orderUpdate => [
+      ReviewFact('Boleta', bookletSerial ?? '—'),
+      ReviewFact('Piezas', '${_sum(localPayload['garments'], 'quantity')}'),
+      ReviewFact('Servicios', '${_count(localPayload['charges'])}'),
+      if (_count(localPayload['discounts']) > 0)
+        ReviewFact('Descuentos', '${_count(localPayload['discounts'])}'),
+      if (localPayload['observations'] != null)
+        ReviewFact('Observaciones', localPayload['observations'] as String),
+    ],
+    ReviewKind.orderStatus => [
+      ReviewFact('Nuevo estado', _statusLabel(localPayload['status'])),
+    ],
+    ReviewKind.orderDeliver => [
+      ReviewFact('Piezas devueltas', '${_sum(localPayload['garments'], 'quantity_delivered')}'),
+      if (localPayload['payment'] case final Map<String, dynamic> payment)
+        ReviewFact('Cobro al entregar', 'Q${payment['amount']}'),
+    ],
+    ReviewKind.orderCancel => [
+      ReviewFact('Motivo', (localPayload['reason'] as String?) ?? '—'),
+    ],
+    ReviewKind.paymentCreate => [
+      ReviewFact('Monto', 'Q${localPayload['amount']}'),
+      ReviewFact('Método', _methodLabel(localPayload['method'])),
+      if (localPayload['reference'] != null)
+        ReviewFact('Referencia', localPayload['reference'] as String),
+    ],
+    ReviewKind.customerCreate || ReviewKind.customerUpdate => [
+      ReviewFact('Nombre', (localPayload['full_name'] as String?) ?? '—'),
+      if (localPayload['phone'] != null)
+        ReviewFact('Teléfono', localPayload['phone'] as String),
+      if (localPayload['nit'] != null) ReviewFact('NIT', localPayload['nit'] as String),
+    ],
+    ReviewKind.customerArchive => const [],
+    ReviewKind.unknown => const [],
+  };
+
+  static int _count(Object? list) => list is List ? list.length : 0;
+
+  static int _sum(Object? list, String field) {
+    if (list is! List) return 0;
+    var total = 0;
+    for (final line in list) {
+      if (line is Map && line[field] is int) total += line[field] as int;
+    }
+    return total;
+  }
+
+  static String _methodLabel(Object? wire) =>
+      wire == 'transfer' ? 'Transferencia' : 'Efectivo';
+
+  static String _statusLabel(Object? wire) => switch (wire) {
+    'received' => 'recibido',
+    'in_process' => 'en proceso',
+    'ready' => 'listo',
+    'delivered' => 'entregado',
+    'cancelled' => 'anulado',
+    _ => '—',
+  };
+}

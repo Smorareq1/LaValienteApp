@@ -7,6 +7,7 @@ import 'encrypted_connection.dart';
 import 'tables/catalog_tables.dart';
 import 'tables/customer_tables.dart';
 import 'tables/order_tables.dart';
+import 'tables/promotion_tables.dart';
 // El código generado inlinea el default de `syncStatus`, que sale de este enum:
 // sin el import, `app_database.g.dart` no compila.
 import 'tables/synced_columns.dart';
@@ -39,13 +40,15 @@ part 'app_database.g.dart';
     OrderChargeEntries,
     OrderDiscountEntries,
     OrderPaymentEntries,
+    // Espejo de promociones (PR 5).
+    PromotionEntries,
   ],
 )
 class AppDatabase extends _$AppDatabase {
   AppDatabase(super.executor);
 
   @override
-  int get schemaVersion => 4;
+  int get schemaVersion => 6;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -76,6 +79,16 @@ class AppDatabase extends _$AppDatabase {
           orderDiscountEntries,
           orderPaymentEntries,
         ]);
+      }
+
+      // La hora de recepción, que la lista del día muestra en cada tarjeta.
+      if (from < 5) {
+        await migrator.addColumn(orderEntries, orderEntries.createdAt);
+      }
+
+      // Espejo de promociones (PR 5).
+      if (from < 6) {
+        await _createAll(migrator, [promotionEntries]);
       }
 
       // Las tablas espejo nacen vacías y el cursor de pull se rebobina: el feed

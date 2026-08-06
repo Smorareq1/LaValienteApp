@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:drift/drift.dart' show Value;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
@@ -7,6 +9,7 @@ import '../../../core/database/app_database.dart';
 import '../../../core/errors/app_failure.dart';
 import '../../../core/storage/secure_storage_service.dart';
 import '../models/device_descriptor.dart';
+import '../models/review_item.dart';
 import '../models/sync_change.dart';
 import '../models/sync_details.dart';
 import '../models/sync_operation.dart';
@@ -84,7 +87,79 @@ class SyncRepository {
 
   Stream<int> watchPendingCount() => _local.watchPendingCount();
 
+  /// Lo que espera subir, desglosado por entidad (§11.1).
+  Stream<Map<String, int>> watchPendingByEntity() => _local.watchPendingByEntity();
+
   Stream<int> watchReviewCount() => _local.watchReviewCount();
+
+  /// La cola de revisión, lo más reciente primero (§8).
+  Stream<List<ReviewItem>> watchReviewItems() {
+    return _local.watchReviewEntries().map(
+      (rows) => rows.map(_toReviewItem).toList(),
+    );
+  }
+
+  /// Descarta la captura: la persona decidió que no debe subir.
+  ///
+  /// Si la operación era un **alta**, se retira además la fila que dejó en el
+  /// dispositivo. Es lo único que el feed no puede corregir por su cuenta,
+  /// porque del otro lado esa entidad nunca existió.
+  Future<void> discardReview(ReviewItem item) {
+    return _local.discardReview(
+      opId: item.opId,
+      entityId: item.entityId,
+      mirror: item.kind.createsLocalRow ? _mirrors[item.entity] : null,
+      at: _clock(),
+    );
+  }
+
+  /// Cierra la entrada sin tocar nada más. Lo usa quien ya resolvió el problema
+  /// por otro camino: corregir la boleta deja su propia operación en el outbox,
+  /// y dejar la entrada abierta pediría dos veces la misma decisión.
+  Future<void> resolveReview(ReviewItem item) =>
+      _local.resolveReview(item.opId, _clock());
+
+  /// Vuelve a mandar la operación tal como se capturó.
+  ///
+  /// [baseVersion] lo aporta quien llama, con la versión que el dispositivo
+  /// conoce **ahora**: la que iba en la operación original es justamente la que
+  /// el servidor ya declaró vieja, y repetirla solo repetiría el choque.
+  ///
+  /// No se vuelve a marcar la fila local como `pending`. Lo que se reenvía es
+  /// un comando, y el estado baja por el feed cuando el servidor lo aplique
+  /// (D5): hasta entonces la pantalla muestra lo que el servidor tiene, que es
+  /// la verdad de ese momento.
+  Future<String> retryReview(ReviewItem item, {int? baseVersion}) async {
+    final opId = _uuid();
+    await _local.retryReview(
+      resolvedOpId: item.opId,
+      opId: opId,
+      entity: item.entity,
+      opType: item.opType,
+      entityId: item.entityId,
+      payload: item.localPayload,
+      baseVersion: baseVersion,
+      at: _clock(),
+    );
+    return opId;
+  }
+
+  ReviewItem _toReviewItem(ReviewEntry row) {
+    return ReviewItem(
+      opId: row.opId,
+      entity: row.entity,
+      opType: row.opType,
+      entityId: row.entityId,
+      outcome: ReviewOutcome.fromWire(row.status),
+      reason: row.reason,
+      localPayload: (jsonDecode(row.localPayload) as Map).cast<String, dynamic>(),
+      serverData: row.serverData == null
+          ? null
+          : (jsonDecode(row.serverData!) as Map).cast<String, dynamic>(),
+      serverVersion: row.serverVersion,
+      createdAt: row.createdAt,
+    );
+  }
 
   Stream<SyncDetails> watchDetails() {
     return _local.watchState().map(

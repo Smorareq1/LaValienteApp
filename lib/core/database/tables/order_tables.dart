@@ -44,6 +44,11 @@ class OrderEntries extends Table with SyncedColumns {
   TextColumn get cancelledById => text().nullable()();
   TextColumn get cancelReason => text().nullable()();
 
+  /// Hora a la que se recibió la boleta. Anulable porque las filas que ya
+  /// estaban en el dispositivo antes de que este campo viajara no la tienen, y
+  /// porque no vale la pena inventarles una.
+  DateTimeColumn get createdAt => dateTime().nullable()();
+
   // Sin `searchIndex` propio, a diferencia de clientes: buscar un pedido por
   // nombre se resuelve uniendo con `customer_entries`, que ya lo tiene. Copiarlo
   // aquí obligaría a reindexar todos los pedidos de alguien cada vez que

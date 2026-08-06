@@ -25,4 +25,13 @@ abstract class SyncEntityMirror {
   /// la regla de arriba, y nada más la sacaría de ese estado. [rejected] marca
   /// las que cayeron a la cola de revisión.
   Future<void> settle(String entityId, {required bool rejected});
+
+  /// Retira del dispositivo un alta que el servidor rechazó y que una persona
+  /// decidió descartar desde la cola de revisión (§8).
+  ///
+  /// Solo se llama sobre altas: son las únicas filas que el feed no puede
+  /// corregir, porque del otro lado nunca existieron. Dejarlas sería peor que
+  /// borrarlas — un pedido fantasma en la lista del día o un pago que descuadra
+  /// el saldo para siempre.
+  Future<void> discard(String entityId);
 }

@@ -31,6 +31,7 @@ Future<void> _pump(
   required SyncStatus status,
   SyncEngineState engine = const SyncEngineState(),
   SyncDetails? details,
+  Map<String, int> pending = const {},
 }) async {
   await tester.pumpWidget(
     ProviderScope(
@@ -38,6 +39,7 @@ Future<void> _pump(
         syncStatusControllerProvider.overrideWith(() => _FixedStatus(status)),
         syncEngineProvider.overrideWith(() => _FixedEngine(engine)),
         syncDetailsProvider.overrideWith((ref) => Stream.value(details ?? const SyncDetails())),
+        pendingByEntityProvider.overrideWith((ref) => Stream.value(pending)),
       ],
       child: const MaterialApp(home: SyncScreen()),
     ),
@@ -85,6 +87,41 @@ void main() {
 
     expect(find.text('2 necesitan revisión'), findsOneWidget);
     expect(find.text('Revisar'), findsOneWidget);
+  });
+
+  testWidgets('lo pendiente se desglosa por tipo', (tester) async {
+    tester.view.physicalSize = const Size(400, 1100);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    await _pump(
+      tester,
+      status: const SyncStatus(state: SyncState.pending, pendingCount: 15),
+      pending: const {'order': 12, 'order_payment': 1, 'customer': 2},
+    );
+
+    // "15 cosas esperando" no le dice a nadie si puede seguir trabajando.
+    expect(find.text('Esperando subir'), findsOneWidget);
+    expect(find.text('Pedidos'), findsOneWidget);
+    expect(find.text('12'), findsOneWidget);
+    expect(find.text('Cobro'), findsOneWidget, reason: 'uno solo no se dice en plural');
+    expect(find.text('Clientes'), findsOneWidget);
+  });
+
+  testWidgets('con capturas rechazadas se ofrece abrir la cola', (tester) async {
+    tester.view.physicalSize = const Size(400, 1000);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    await _pump(
+      tester,
+      status: const SyncStatus(state: SyncState.needsReview, reviewCount: 2),
+    );
+
+    // Decir que hay capturas rechazadas sin dar la puerta solo serviría para
+    // preocupar.
+    expect(find.text('2 capturas necesitan tu decisión'), findsOneWidget);
+    expect(find.text('Abrir la cola de revisión'), findsOneWidget);
   });
 
   testWidgets('un reloj desfasado se señala en el diagnóstico', (tester) async {

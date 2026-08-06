@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../atoms/app_text_field.dart';
 import '../tokens/app_colors.dart';
@@ -23,6 +24,7 @@ class AppFormField extends StatelessWidget {
     this.keyboardType,
     this.textInputAction,
     this.autofillHints,
+    this.inputFormatters,
     this.onChanged,
     this.onSubmitted,
   });
@@ -46,6 +48,7 @@ class AppFormField extends StatelessWidget {
   final TextInputType? keyboardType;
   final TextInputAction? textInputAction;
   final Iterable<String>? autofillHints;
+  final List<TextInputFormatter>? inputFormatters;
   final ValueChanged<String>? onChanged;
   final ValueChanged<String>? onSubmitted;
 
@@ -83,6 +86,7 @@ class AppFormField extends StatelessWidget {
           keyboardType: keyboardType,
           textInputAction: textInputAction,
           autofillHints: autofillHints,
+          inputFormatters: inputFormatters,
           onChanged: onChanged,
           onSubmitted: onSubmitted,
         ),

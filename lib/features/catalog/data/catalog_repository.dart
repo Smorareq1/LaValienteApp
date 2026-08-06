@@ -21,64 +21,90 @@ class CatalogRepository {
   ///
   /// Un solo `join` en lugar de una consulta por servicio: así drift vigila las
   /// dos tablas con un stream y la pantalla se redibuja una vez, no N veces.
-  Stream<List<ServiceType>> watchServices() {
+  Stream<List<ServiceType>> watchServices() => _servicesQuery().watch().map(_toServices);
+
+  /// Los servicios en un solo tiro, para quien no necesita seguirlos en vivo.
+  ///
+  /// La toma de pedido los lee así: el catálogo lo edita un admin y no cambia a
+  /// media captura, y redibujar la pantalla entera porque bajó un precio nuevo
+  /// mientras alguien cuenta camisas sería peor que leerlo una vez al abrir.
+  Future<List<ServiceType>> services() async => _toServices(await _servicesQuery().get());
+
+  Stream<List<GarmentType>> watchGarmentTypes() =>
+      _garmentTypesQuery().watch().map((rows) => rows.map(GarmentType.fromRow).toList());
+
+  Future<List<GarmentType>> garmentTypes() async =>
+      (await _garmentTypesQuery().get()).map(GarmentType.fromRow).toList();
+
+  /// Todos los precios vivos, para armar el libro de precios de una fecha.
+  ///
+  /// Se traen completos y se filtra por vigencia en memoria: son unas decenas de
+  /// filas, y hacerlo así deja el filtro de fechas en un solo lugar
+  /// ([ServicePrice.covers]) en vez de repetirlo en SQL.
+  Future<List<ServicePrice>> prices() async {
+    final rows = await (_database.select(
+      _database.servicePriceEntries,
+    )..where((row) => row.deletedAt.isNull())).get();
+    return rows.map(ServicePrice.fromRow).toList();
+  }
+
+  JoinedSelectStatement<HasResultSet, dynamic> _servicesQuery() {
     final services = _database.serviceTypeEntries;
     final options = _database.serviceOptionEntries;
 
-    final query =
-        _database.select(services).join([
-            leftOuterJoin(
-              options,
-              options.serviceTypeId.equalsExp(services.id) &
-                  options.deletedAt.isNull() &
-                  options.isActive.equals(true),
-            ),
-          ])
-          ..where(services.deletedAt.isNull() & services.isActive.equals(true))
-          ..orderBy([
-            OrderingTerm.asc(services.sortOrder),
-            OrderingTerm.asc(services.name),
-            OrderingTerm.asc(options.sortOrder),
-          ]);
-
-    return query.watch().map((rows) {
-      final byId = <String, ServiceTypeEntry>{};
-      final optionsByService = <String, List<ServiceOption>>{};
-
-      for (final row in rows) {
-        final service = row.readTable(services);
-        byId[service.id] = service;
-        final option = row.readTableOrNull(options);
-        if (option != null) {
-          optionsByService.putIfAbsent(service.id, () => []).add(ServiceOption.fromRow(option));
-        }
-      }
-
-      return byId.values
-          .map(
-            (service) => ServiceType(
-              id: service.id,
-              code: service.code,
-              name: service.name,
-              pricingMode: PricingMode.fromWire(service.pricingMode),
-              unitLabel: service.unitLabel,
-              sortOrder: service.sortOrder,
-              options: optionsByService[service.id] ?? const [],
-            ),
-          )
-          .toList();
-    });
+    return _database.select(services).join([
+        leftOuterJoin(
+          options,
+          options.serviceTypeId.equalsExp(services.id) &
+              options.deletedAt.isNull() &
+              options.isActive.equals(true),
+        ),
+      ])
+      ..where(services.deletedAt.isNull() & services.isActive.equals(true))
+      ..orderBy([
+        OrderingTerm.asc(services.sortOrder),
+        OrderingTerm.asc(services.name),
+        OrderingTerm.asc(options.sortOrder),
+      ]);
   }
 
-  Stream<List<GarmentType>> watchGarmentTypes() {
-    return (_database.select(_database.garmentTypeEntries)
-          ..where((row) => row.deletedAt.isNull() & row.isActive.equals(true))
-          ..orderBy([
-            (row) => OrderingTerm.asc(row.sortOrder),
-            (row) => OrderingTerm.asc(row.name),
-          ]))
-        .watch()
-        .map((rows) => rows.map(GarmentType.fromRow).toList());
+  List<ServiceType> _toServices(List<TypedResult> rows) {
+    final services = _database.serviceTypeEntries;
+    final options = _database.serviceOptionEntries;
+    final byId = <String, ServiceTypeEntry>{};
+    final optionsByService = <String, List<ServiceOption>>{};
+
+    for (final row in rows) {
+      final service = row.readTable(services);
+      byId[service.id] = service;
+      final option = row.readTableOrNull(options);
+      if (option != null) {
+        optionsByService.putIfAbsent(service.id, () => []).add(ServiceOption.fromRow(option));
+      }
+    }
+
+    return byId.values
+        .map(
+          (service) => ServiceType(
+            id: service.id,
+            code: service.code,
+            name: service.name,
+            pricingMode: PricingMode.fromWire(service.pricingMode),
+            unitLabel: service.unitLabel,
+            sortOrder: service.sortOrder,
+            options: optionsByService[service.id] ?? const [],
+          ),
+        )
+        .toList();
+  }
+
+  SimpleSelectStatement<$GarmentTypeEntriesTable, GarmentTypeEntry> _garmentTypesQuery() {
+    return _database.select(_database.garmentTypeEntries)
+      ..where((row) => row.deletedAt.isNull() & row.isActive.equals(true))
+      ..orderBy([
+        (row) => OrderingTerm.asc(row.sortOrder),
+        (row) => OrderingTerm.asc(row.name),
+      ]);
   }
 
   /// El precio vigente en [onDate] (`YYYY-MM-DD`), o `null` si no hay ninguno.

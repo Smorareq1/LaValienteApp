@@ -11,10 +11,24 @@ abstract final class AppPermissions {
   // Pedidos — Plan 0001 §9.
   static const String ordersRead = 'orders.read';
   static const String ordersCreate = 'orders.create';
+
+  /// Mover el pedido por la cadena `recibido → en proceso → listo`. Lo tiene
+  /// todo colaborador; entregar y anular piden lo suyo aparte.
+  static const String ordersUpdate = 'orders.update';
+
+  /// Corregir un pedido que ya está listo (plan 0001 §7.3). Los estados
+  /// `recibido` y `en proceso` los edita cualquiera con `ordersUpdate`; uno ya
+  /// contado, lavado y doblado es decisión de un admin.
+  static const String ordersUpdateReady = 'orders.update_ready';
+
   static const String ordersDeliver = 'orders.deliver';
   static const String ordersDeliverUnpaid = 'orders.deliver_unpaid';
   static const String ordersCollectPayment = 'orders.collect_payment';
   static const String ordersCancel = 'orders.cancel';
+
+  /// Rebajar un pedido sin una promoción detrás. El chequeo del backend vive en
+  /// el service porque la condición es el cuerpo del pedido, no la ruta.
+  static const String ordersManualDiscount = 'orders.manual_discount';
 
   // Clientes.
   static const String customersRead = 'customers.read';

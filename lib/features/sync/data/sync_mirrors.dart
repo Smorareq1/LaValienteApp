@@ -5,6 +5,7 @@ import '../../../core/database/app_database.dart';
 import '../../catalog/data/catalog_mirrors.dart';
 import '../../customers/data/customer_mirror.dart';
 import '../../orders/data/order_mirrors.dart';
+import '../../promotions/data/promotion_mirror.dart';
 import 'entity_mirror.dart';
 
 part 'sync_mirrors.g.dart';
@@ -25,6 +26,7 @@ Map<String, SyncEntityMirror> syncMirrors(Ref ref) {
     ...catalogMirrors(database),
     CustomerMirror(database),
     ...orderMirrors(database),
+    PromotionMirror(database),
   ];
   return {for (final mirror in mirrors) mirror.entity: mirror};
 }

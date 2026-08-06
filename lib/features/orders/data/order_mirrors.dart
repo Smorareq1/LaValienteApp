@@ -1,6 +1,7 @@
 import 'package:drift/drift.dart';
 
 import '../../../core/database/app_database.dart';
+import '../../../core/database/tables/synced_columns.dart';
 import '../../sync/data/table_mirror.dart';
 import '../../sync/models/sync_change.dart';
 
@@ -57,7 +58,73 @@ class OrderMirror extends TableMirror<OrderEntry> {
       cancelledAt: Value(_instant(data['cancelled_at'])),
       cancelledById: Value(data['cancelled_by_id'] as String?),
       cancelReason: Value(data['cancel_reason'] as String?),
+      createdAt: Value(_instant(data['created_at'])),
     );
+  }
+
+  /// La boleta se resuelve entera: sus líneas también dejan de estar protegidas.
+  ///
+  /// Una boleta es **una** unidad de trabajo en el outbox —una sola operación
+  /// `order/create` que lleva prendas, cargos y descuentos dentro— pero cinco
+  /// filas en la BD local. Sin esta cascada las hijas se quedarían `pending`
+  /// para siempre: el motor solo conoce la entidad que nombra la operación, y el
+  /// pull nunca podría traerles los montos que el servidor recalculó.
+  @override
+  Future<void> settle(String entityId, {required bool rejected}) async {
+    await super.settle(entityId, rejected: rejected);
+    final status = rejected ? RowSyncStatus.rejected : RowSyncStatus.synced;
+
+    for (final child in <TableInfo<Table, DataClass>>[
+      database.orderGarmentEntries,
+      database.orderChargeEntries,
+      database.orderDiscountEntries,
+    ]) {
+      await database.customUpdate(
+        'UPDATE ${child.actualTableName} SET sync_status = ? WHERE order_id = ?',
+        variables: [Variable<String>(status.name), Variable<String>(entityId)],
+        updates: {child},
+      );
+    }
+
+    // De los pagos solo el anticipo: es el único que pudo llegar dentro de la
+    // captura. Un pago cobrado después viaja como operación propia y la resuelve
+    // su propio espejo, así que tocarlo aquí lo desprotegería antes de tiempo.
+    await database.customUpdate(
+      'UPDATE ${database.orderPaymentEntries.actualTableName} '
+      'SET sync_status = ? WHERE order_id = ? AND is_advance = 1',
+      variables: [Variable<String>(status.name), Variable<String>(entityId)],
+      updates: {database.orderPaymentEntries},
+    );
+  }
+
+  /// Descartar la boleta se lleva sus líneas y su anticipo.
+  ///
+  /// Marcar solo la cabecera bastaría para que desapareciera de la pantalla
+  /// —todos los lectores filtran tombstones—, pero el anticipo dejaría dinero
+  /// contado en un pedido que ya no existe, y el día no cuadraría por una fila
+  /// que nadie puede ver.
+  @override
+  Future<void> discard(String entityId) async {
+    await super.discard(entityId);
+    final now = DateTime.now();
+
+    for (final child in <TableInfo<Table, DataClass>>[
+      database.orderGarmentEntries,
+      database.orderChargeEntries,
+      database.orderDiscountEntries,
+      database.orderPaymentEntries,
+    ]) {
+      await database.customUpdate(
+        'UPDATE ${child.actualTableName} SET deleted_at = ?, sync_status = ? '
+        'WHERE order_id = ? AND deleted_at IS NULL',
+        variables: [
+          Variable<DateTime>(now),
+          Variable<String>(RowSyncStatus.synced.name),
+          Variable<String>(entityId),
+        ],
+        updates: {child},
+      );
+    }
   }
 }
 

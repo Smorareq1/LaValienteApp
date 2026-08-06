@@ -1,13 +1,16 @@
 import 'package:design_system/design_system.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../shell/ui/widgets/gradient_header.dart';
 import '../data/sync_repository.dart';
 import '../models/sync_details.dart';
+import '../models/sync_entity_label.dart';
 import '../models/sync_status.dart';
 import '../state/sync_engine.dart';
 import '../state/sync_status_controller.dart';
+import 'review_queue_screen.dart';
 
 /// Pantalla de Sincronización (Plan 0006 §11): qué está subido, qué falta y
 /// por qué.
@@ -25,6 +28,7 @@ class SyncScreen extends ConsumerWidget {
     final status = ref.watch(syncStatusControllerProvider);
     final engine = ref.watch(syncEngineProvider);
     final details = ref.watch(syncDetailsProvider).valueOrNull;
+    final pending = ref.watch(pendingByEntityProvider).valueOrNull ?? const {};
 
     return Scaffold(
       backgroundColor: AppColors.gray50,
@@ -36,6 +40,10 @@ class SyncScreen extends ConsumerWidget {
               padding: const EdgeInsets.fromLTRB(AppSpacing.md, 16, AppSpacing.md, 28),
               children: [
                 _StatusCard(status: status, engine: engine),
+                if (status.hasReview) ...[
+                  const SizedBox(height: 12),
+                  _ReviewLink(count: status.reviewCount),
+                ],
                 const SizedBox(height: 18),
                 AppButton(
                   label: 'Sincronizar ahora',
@@ -44,6 +52,11 @@ class SyncScreen extends ConsumerWidget {
                   loading: engine.progress.isRunning,
                   onPressed: () => ref.read(syncEngineProvider.notifier).sync(),
                 ),
+                if (pending.isNotEmpty) ...[
+                  const SizedBox(height: 24),
+                  const AppSectionHeader(title: 'Esperando subir'),
+                  _PendingByType(pending: pending),
+                ],
                 const SizedBox(height: 24),
                 const AppSectionHeader(
                   title: 'Diagnóstico',
@@ -53,6 +66,76 @@ class SyncScreen extends ConsumerWidget {
               ],
             ),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Entrada a la cola de revisión desde el estado de sincronización.
+///
+/// La tarjeta de arriba ya dice que hay capturas rechazadas; sin esta puerta,
+/// decirlo solo serviría para preocupar.
+class _ReviewLink extends StatelessWidget {
+  const _ReviewLink({required this.count});
+
+  final int count;
+
+  @override
+  Widget build(BuildContext context) {
+    return AppListCard(
+      title: count == 1 ? '1 captura necesita tu decisión' : '$count capturas necesitan tu decisión',
+      subtitle: 'Abrir la cola de revisión',
+      onTap: () => context.push(ReviewQueueScreen.path),
+      leading: Container(
+        width: 36,
+        height: 36,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: AppColors.errorBg,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: const Icon(
+          Icons.priority_high_rounded,
+          size: 18,
+          color: AppColors.errorText,
+        ),
+      ),
+      trailing: const Icon(
+        Icons.chevron_right_rounded,
+        size: 18,
+        color: AppColors.textSecondary,
+      ),
+    );
+  }
+}
+
+/// Pendientes por tipo (§11.1).
+class _PendingByType extends StatelessWidget {
+  const _PendingByType({required this.pending});
+
+  final Map<String, int> pending;
+
+  @override
+  Widget build(BuildContext context) {
+    final entries = pending.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.border),
+        boxShadow: AppShadows.card,
+      ),
+      child: Column(
+        children: [
+          for (final entry in entries)
+            _Row(
+              label: syncEntityLabel(entry.key, count: entry.value),
+              value: '${entry.value}',
+            ),
         ],
       ),
     );

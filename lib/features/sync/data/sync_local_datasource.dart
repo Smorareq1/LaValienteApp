@@ -103,6 +103,24 @@ class SyncLocalDataSource {
     return query.watchSingle().map((row) => row.read(count) ?? 0);
   }
 
+  /// Cuántas operaciones esperan, por entidad (§11.1).
+  ///
+  /// Es la diferencia entre "hay 14 cosas pendientes" y "hay 14 cobros
+  /// pendientes": lo primero no le dice a nadie si el problema es grave.
+  Stream<Map<String, int>> watchPendingByEntity() {
+    final entity = _database.outboxEntries.entity;
+    final count = _database.outboxEntries.seq.count();
+    final query = _database.selectOnly(_database.outboxEntries)
+      ..addColumns([entity, count])
+      ..groupBy([entity]);
+
+    return query.watch().map((rows) {
+      return {
+        for (final row in rows) row.read(entity)!: row.read(count) ?? 0,
+      };
+    });
+  }
+
   /// Saca del outbox las operaciones que el servidor ya dio por buenas.
   Future<void> removeOperations(Iterable<String> opIds) async {
     if (opIds.isEmpty) return;
@@ -159,6 +177,72 @@ class SyncLocalDataSource {
       ..addColumns([count])
       ..where(_database.reviewEntries.resolvedAt.isNull());
     return query.watchSingle().map((row) => row.read(count) ?? 0);
+  }
+
+  /// Lo que espera decisión, lo más reciente primero.
+  Stream<List<ReviewEntry>> watchReviewEntries() {
+    return (_database.select(_database.reviewEntries)
+          ..where((row) => row.resolvedAt.isNull())
+          ..orderBy([(row) => OrderingTerm.desc(row.createdAt)]))
+        .watch();
+  }
+
+  /// Cierra una entrada: la persona ya decidió.
+  ///
+  /// La fila se conserva con su fecha de resolución en vez de borrarse, porque
+  /// es el único rastro que queda en el dispositivo de que una captura no llegó
+  /// —y de qué se hizo con ella.
+  Future<void> resolveReview(String opId, DateTime at) async {
+    await (_database.update(
+      _database.reviewEntries,
+    )..where((row) => row.opId.equals(opId))).write(
+      ReviewEntriesCompanion(resolvedAt: Value(at)),
+    );
+  }
+
+  /// Descarta la captura: se retira lo que quedó en el dispositivo y se cierra
+  /// la entrada, en una transacción.
+  ///
+  /// Separarlas dejaría o un pedido fantasma que ya nadie revisa, o una entrada
+  /// abierta sobre datos que ya no están.
+  Future<void> discardReview({
+    required String opId,
+    required String entityId,
+    required SyncEntityMirror? mirror,
+    required DateTime at,
+  }) {
+    return _database.transaction(() async {
+      await mirror?.discard(entityId);
+      await resolveReview(opId, at);
+    });
+  }
+
+  /// Vuelve a encolar la operación y cierra la entrada, en una transacción.
+  ///
+  /// Se encola con un `op_id` **nuevo**: el viejo ya tiene recibo en el
+  /// servidor y reintentarlo solo devolvería el mismo rechazo guardado (D4).
+  Future<void> retryReview({
+    required String resolvedOpId,
+    required String opId,
+    required String entity,
+    required String opType,
+    required String entityId,
+    required Map<String, dynamic> payload,
+    required DateTime at,
+    int? baseVersion,
+  }) {
+    return _database.transaction(() async {
+      await enqueue(
+        opId: opId,
+        entity: entity,
+        opType: opType,
+        entityId: entityId,
+        payload: payload,
+        baseVersion: baseVersion,
+        createdAt: at,
+      );
+      await resolveReview(resolvedOpId, at);
+    });
   }
 
   // --- Feed de cambios ------------------------------------------------------

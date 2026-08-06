@@ -5815,6 +5815,17 @@ class $OrderEntriesTable extends OrderEntries
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+    'created_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -5839,6 +5850,7 @@ class $OrderEntriesTable extends OrderEntries
     cancelledAt,
     cancelledById,
     cancelReason,
+    createdAt,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -6032,6 +6044,12 @@ class $OrderEntriesTable extends OrderEntries
         ),
       );
     }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    }
     return context;
   }
 
@@ -6129,6 +6147,10 @@ class $OrderEntriesTable extends OrderEntries
         DriftSqlType.string,
         data['${effectivePrefix}cancel_reason'],
       ),
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}created_at'],
+      ),
     );
   }
 
@@ -6176,6 +6198,11 @@ class OrderEntry extends DataClass implements Insertable<OrderEntry> {
   final DateTime? cancelledAt;
   final String? cancelledById;
   final String? cancelReason;
+
+  /// Hora a la que se recibió la boleta. Anulable porque las filas que ya
+  /// estaban en el dispositivo antes de que este campo viajara no la tienen, y
+  /// porque no vale la pena inventarles una.
+  final DateTime? createdAt;
   const OrderEntry({
     required this.id,
     required this.version,
@@ -6199,6 +6226,7 @@ class OrderEntry extends DataClass implements Insertable<OrderEntry> {
     this.cancelledAt,
     this.cancelledById,
     this.cancelReason,
+    this.createdAt,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -6245,6 +6273,9 @@ class OrderEntry extends DataClass implements Insertable<OrderEntry> {
     if (!nullToAbsent || cancelReason != null) {
       map['cancel_reason'] = Variable<String>(cancelReason);
     }
+    if (!nullToAbsent || createdAt != null) {
+      map['created_at'] = Variable<DateTime>(createdAt);
+    }
     return map;
   }
 
@@ -6290,6 +6321,9 @@ class OrderEntry extends DataClass implements Insertable<OrderEntry> {
       cancelReason: cancelReason == null && nullToAbsent
           ? const Value.absent()
           : Value(cancelReason),
+      createdAt: createdAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(createdAt),
     );
   }
 
@@ -6321,6 +6355,7 @@ class OrderEntry extends DataClass implements Insertable<OrderEntry> {
       cancelledAt: serializer.fromJson<DateTime?>(json['cancelledAt']),
       cancelledById: serializer.fromJson<String?>(json['cancelledById']),
       cancelReason: serializer.fromJson<String?>(json['cancelReason']),
+      createdAt: serializer.fromJson<DateTime?>(json['createdAt']),
     );
   }
   @override
@@ -6349,6 +6384,7 @@ class OrderEntry extends DataClass implements Insertable<OrderEntry> {
       'cancelledAt': serializer.toJson<DateTime?>(cancelledAt),
       'cancelledById': serializer.toJson<String?>(cancelledById),
       'cancelReason': serializer.toJson<String?>(cancelReason),
+      'createdAt': serializer.toJson<DateTime?>(createdAt),
     };
   }
 
@@ -6375,6 +6411,7 @@ class OrderEntry extends DataClass implements Insertable<OrderEntry> {
     Value<DateTime?> cancelledAt = const Value.absent(),
     Value<String?> cancelledById = const Value.absent(),
     Value<String?> cancelReason = const Value.absent(),
+    Value<DateTime?> createdAt = const Value.absent(),
   }) => OrderEntry(
     id: id ?? this.id,
     version: version ?? this.version,
@@ -6404,6 +6441,7 @@ class OrderEntry extends DataClass implements Insertable<OrderEntry> {
         ? cancelledById.value
         : this.cancelledById,
     cancelReason: cancelReason.present ? cancelReason.value : this.cancelReason,
+    createdAt: createdAt.present ? createdAt.value : this.createdAt,
   );
   OrderEntry copyWithCompanion(OrderEntriesCompanion data) {
     return OrderEntry(
@@ -6455,6 +6493,7 @@ class OrderEntry extends DataClass implements Insertable<OrderEntry> {
       cancelReason: data.cancelReason.present
           ? data.cancelReason.value
           : this.cancelReason,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
     );
   }
 
@@ -6482,7 +6521,8 @@ class OrderEntry extends DataClass implements Insertable<OrderEntry> {
           ..write('deliveredById: $deliveredById, ')
           ..write('cancelledAt: $cancelledAt, ')
           ..write('cancelledById: $cancelledById, ')
-          ..write('cancelReason: $cancelReason')
+          ..write('cancelReason: $cancelReason, ')
+          ..write('createdAt: $createdAt')
           ..write(')'))
         .toString();
   }
@@ -6511,6 +6551,7 @@ class OrderEntry extends DataClass implements Insertable<OrderEntry> {
     cancelledAt,
     cancelledById,
     cancelReason,
+    createdAt,
   ]);
   @override
   bool operator ==(Object other) =>
@@ -6537,7 +6578,8 @@ class OrderEntry extends DataClass implements Insertable<OrderEntry> {
           other.deliveredById == this.deliveredById &&
           other.cancelledAt == this.cancelledAt &&
           other.cancelledById == this.cancelledById &&
-          other.cancelReason == this.cancelReason);
+          other.cancelReason == this.cancelReason &&
+          other.createdAt == this.createdAt);
 }
 
 class OrderEntriesCompanion extends UpdateCompanion<OrderEntry> {
@@ -6563,6 +6605,7 @@ class OrderEntriesCompanion extends UpdateCompanion<OrderEntry> {
   final Value<DateTime?> cancelledAt;
   final Value<String?> cancelledById;
   final Value<String?> cancelReason;
+  final Value<DateTime?> createdAt;
   final Value<int> rowid;
   const OrderEntriesCompanion({
     this.id = const Value.absent(),
@@ -6587,6 +6630,7 @@ class OrderEntriesCompanion extends UpdateCompanion<OrderEntry> {
     this.cancelledAt = const Value.absent(),
     this.cancelledById = const Value.absent(),
     this.cancelReason = const Value.absent(),
+    this.createdAt = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   OrderEntriesCompanion.insert({
@@ -6612,6 +6656,7 @@ class OrderEntriesCompanion extends UpdateCompanion<OrderEntry> {
     this.cancelledAt = const Value.absent(),
     this.cancelledById = const Value.absent(),
     this.cancelReason = const Value.absent(),
+    this.createdAt = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        orderDate = Value(orderDate),
@@ -6645,6 +6690,7 @@ class OrderEntriesCompanion extends UpdateCompanion<OrderEntry> {
     Expression<DateTime>? cancelledAt,
     Expression<String>? cancelledById,
     Expression<String>? cancelReason,
+    Expression<DateTime>? createdAt,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -6670,6 +6716,7 @@ class OrderEntriesCompanion extends UpdateCompanion<OrderEntry> {
       if (cancelledAt != null) 'cancelled_at': cancelledAt,
       if (cancelledById != null) 'cancelled_by_id': cancelledById,
       if (cancelReason != null) 'cancel_reason': cancelReason,
+      if (createdAt != null) 'created_at': createdAt,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -6697,6 +6744,7 @@ class OrderEntriesCompanion extends UpdateCompanion<OrderEntry> {
     Value<DateTime?>? cancelledAt,
     Value<String?>? cancelledById,
     Value<String?>? cancelReason,
+    Value<DateTime?>? createdAt,
     Value<int>? rowid,
   }) {
     return OrderEntriesCompanion(
@@ -6722,6 +6770,7 @@ class OrderEntriesCompanion extends UpdateCompanion<OrderEntry> {
       cancelledAt: cancelledAt ?? this.cancelledAt,
       cancelledById: cancelledById ?? this.cancelledById,
       cancelReason: cancelReason ?? this.cancelReason,
+      createdAt: createdAt ?? this.createdAt,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -6795,6 +6844,9 @@ class OrderEntriesCompanion extends UpdateCompanion<OrderEntry> {
     if (cancelReason.present) {
       map['cancel_reason'] = Variable<String>(cancelReason.value);
     }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -6826,6 +6878,7 @@ class OrderEntriesCompanion extends UpdateCompanion<OrderEntry> {
           ..write('cancelledAt: $cancelledAt, ')
           ..write('cancelledById: $cancelledById, ')
           ..write('cancelReason: $cancelReason, ')
+          ..write('createdAt: $createdAt, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -9301,6 +9354,809 @@ class OrderPaymentEntriesCompanion extends UpdateCompanion<OrderPaymentEntry> {
   }
 }
 
+class $PromotionEntriesTable extends PromotionEntries
+    with TableInfo<$PromotionEntriesTable, PromotionEntry> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $PromotionEntriesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _versionMeta = const VerificationMeta(
+    'version',
+  );
+  @override
+  late final GeneratedColumn<int> version = GeneratedColumn<int>(
+    'version',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _syncStatusMeta = const VerificationMeta(
+    'syncStatus',
+  );
+  @override
+  late final GeneratedColumn<String> syncStatus = GeneratedColumn<String>(
+    'sync_status',
+    aliasedName,
+    false,
+    additionalChecks: GeneratedColumn.checkTextLength(maxTextLength: 20),
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: Constant(RowSyncStatus.synced.name),
+  );
+  static const VerificationMeta _deletedAtMeta = const VerificationMeta(
+    'deletedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> deletedAt = GeneratedColumn<DateTime>(
+    'deleted_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _codeMeta = const VerificationMeta('code');
+  @override
+  late final GeneratedColumn<String> code = GeneratedColumn<String>(
+    'code',
+    aliasedName,
+    false,
+    additionalChecks: GeneratedColumn.checkTextLength(maxTextLength: 50),
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _nameMeta = const VerificationMeta('name');
+  @override
+  late final GeneratedColumn<String> name = GeneratedColumn<String>(
+    'name',
+    aliasedName,
+    false,
+    additionalChecks: GeneratedColumn.checkTextLength(maxTextLength: 120),
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _descriptionMeta = const VerificationMeta(
+    'description',
+  );
+  @override
+  late final GeneratedColumn<String> description = GeneratedColumn<String>(
+    'description',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _discountTypeMeta = const VerificationMeta(
+    'discountType',
+  );
+  @override
+  late final GeneratedColumn<String> discountType = GeneratedColumn<String>(
+    'discount_type',
+    aliasedName,
+    false,
+    additionalChecks: GeneratedColumn.checkTextLength(maxTextLength: 20),
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _valueMeta = const VerificationMeta('value');
+  @override
+  late final GeneratedColumn<String> value = GeneratedColumn<String>(
+    'value',
+    aliasedName,
+    false,
+    additionalChecks: GeneratedColumn.checkTextLength(maxTextLength: 20),
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _appliesToServiceCodesMeta =
+      const VerificationMeta('appliesToServiceCodes');
+  @override
+  late final GeneratedColumn<String> appliesToServiceCodes =
+      GeneratedColumn<String>(
+        'applies_to_service_codes',
+        aliasedName,
+        true,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _validFromMeta = const VerificationMeta(
+    'validFrom',
+  );
+  @override
+  late final GeneratedColumn<String> validFrom = GeneratedColumn<String>(
+    'valid_from',
+    aliasedName,
+    false,
+    additionalChecks: GeneratedColumn.checkTextLength(maxTextLength: 10),
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _validToMeta = const VerificationMeta(
+    'validTo',
+  );
+  @override
+  late final GeneratedColumn<String> validTo = GeneratedColumn<String>(
+    'valid_to',
+    aliasedName,
+    true,
+    additionalChecks: GeneratedColumn.checkTextLength(maxTextLength: 10),
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _isActiveMeta = const VerificationMeta(
+    'isActive',
+  );
+  @override
+  late final GeneratedColumn<bool> isActive = GeneratedColumn<bool>(
+    'is_active',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("is_active" IN (0, 1))',
+    ),
+    defaultValue: const Constant(true),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    version,
+    syncStatus,
+    deletedAt,
+    code,
+    name,
+    description,
+    discountType,
+    value,
+    appliesToServiceCodes,
+    validFrom,
+    validTo,
+    isActive,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'promotion_entries';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<PromotionEntry> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('version')) {
+      context.handle(
+        _versionMeta,
+        version.isAcceptableOrUnknown(data['version']!, _versionMeta),
+      );
+    }
+    if (data.containsKey('sync_status')) {
+      context.handle(
+        _syncStatusMeta,
+        syncStatus.isAcceptableOrUnknown(data['sync_status']!, _syncStatusMeta),
+      );
+    }
+    if (data.containsKey('deleted_at')) {
+      context.handle(
+        _deletedAtMeta,
+        deletedAt.isAcceptableOrUnknown(data['deleted_at']!, _deletedAtMeta),
+      );
+    }
+    if (data.containsKey('code')) {
+      context.handle(
+        _codeMeta,
+        code.isAcceptableOrUnknown(data['code']!, _codeMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_codeMeta);
+    }
+    if (data.containsKey('name')) {
+      context.handle(
+        _nameMeta,
+        name.isAcceptableOrUnknown(data['name']!, _nameMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_nameMeta);
+    }
+    if (data.containsKey('description')) {
+      context.handle(
+        _descriptionMeta,
+        description.isAcceptableOrUnknown(
+          data['description']!,
+          _descriptionMeta,
+        ),
+      );
+    }
+    if (data.containsKey('discount_type')) {
+      context.handle(
+        _discountTypeMeta,
+        discountType.isAcceptableOrUnknown(
+          data['discount_type']!,
+          _discountTypeMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_discountTypeMeta);
+    }
+    if (data.containsKey('value')) {
+      context.handle(
+        _valueMeta,
+        value.isAcceptableOrUnknown(data['value']!, _valueMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_valueMeta);
+    }
+    if (data.containsKey('applies_to_service_codes')) {
+      context.handle(
+        _appliesToServiceCodesMeta,
+        appliesToServiceCodes.isAcceptableOrUnknown(
+          data['applies_to_service_codes']!,
+          _appliesToServiceCodesMeta,
+        ),
+      );
+    }
+    if (data.containsKey('valid_from')) {
+      context.handle(
+        _validFromMeta,
+        validFrom.isAcceptableOrUnknown(data['valid_from']!, _validFromMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_validFromMeta);
+    }
+    if (data.containsKey('valid_to')) {
+      context.handle(
+        _validToMeta,
+        validTo.isAcceptableOrUnknown(data['valid_to']!, _validToMeta),
+      );
+    }
+    if (data.containsKey('is_active')) {
+      context.handle(
+        _isActiveMeta,
+        isActive.isAcceptableOrUnknown(data['is_active']!, _isActiveMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  PromotionEntry map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return PromotionEntry(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      version: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}version'],
+      )!,
+      syncStatus: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}sync_status'],
+      )!,
+      deletedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}deleted_at'],
+      ),
+      code: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}code'],
+      )!,
+      name: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}name'],
+      )!,
+      description: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}description'],
+      ),
+      discountType: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}discount_type'],
+      )!,
+      value: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}value'],
+      )!,
+      appliesToServiceCodes: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}applies_to_service_codes'],
+      ),
+      validFrom: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}valid_from'],
+      )!,
+      validTo: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}valid_to'],
+      ),
+      isActive: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}is_active'],
+      )!,
+    );
+  }
+
+  @override
+  $PromotionEntriesTable createAlias(String alias) {
+    return $PromotionEntriesTable(attachedDatabase, alias);
+  }
+}
+
+class PromotionEntry extends DataClass implements Insertable<PromotionEntry> {
+  /// UUID generado por quien creó la fila, dispositivo o servidor (D3).
+  final String id;
+
+  /// Versión conocida del servidor. `0` mientras la fila solo existe local.
+  final int version;
+  final String syncStatus;
+
+  /// Tombstone: la fila se conserva para que el borrado se propague, pero no
+  /// se muestra (D8).
+  final DateTime? deletedAt;
+
+  /// El código que viaja en el pedido. La app manda **esto** y nunca el monto
+  /// (D5): cuánto rebaja lo resuelve el servidor al aplicar la operación.
+  final String code;
+  final String name;
+  final String? description;
+
+  /// `percentage`, `fixed_amount` o `special_price` (plan 0001 §5.4). String y
+  /// no enum local, igual que el modo de cobro del catálogo: un tipo nuevo de
+  /// descuento no puede obligar a migrar la BD del teléfono.
+  final String discountType;
+
+  /// Texto por la razón de siempre: `50` es un porcentaje y `35.00` un precio,
+  /// y ninguno de los dos sobrevive intacto a un `double`.
+  final String value;
+
+  /// Lista JSON de códigos de servicio, o `null` = aplica a todo el pedido.
+  /// Se guarda como llegó y se decodifica al leer: una tabla puente para tres
+  /// promociones sería una junta más en cada cálculo del footer.
+  final String? appliesToServiceCodes;
+
+  /// Fechas de negocio en `YYYY-MM-DD`, sin hora ni zona.
+  final String validFrom;
+  final String? validTo;
+  final bool isActive;
+  const PromotionEntry({
+    required this.id,
+    required this.version,
+    required this.syncStatus,
+    this.deletedAt,
+    required this.code,
+    required this.name,
+    this.description,
+    required this.discountType,
+    required this.value,
+    this.appliesToServiceCodes,
+    required this.validFrom,
+    this.validTo,
+    required this.isActive,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['version'] = Variable<int>(version);
+    map['sync_status'] = Variable<String>(syncStatus);
+    if (!nullToAbsent || deletedAt != null) {
+      map['deleted_at'] = Variable<DateTime>(deletedAt);
+    }
+    map['code'] = Variable<String>(code);
+    map['name'] = Variable<String>(name);
+    if (!nullToAbsent || description != null) {
+      map['description'] = Variable<String>(description);
+    }
+    map['discount_type'] = Variable<String>(discountType);
+    map['value'] = Variable<String>(value);
+    if (!nullToAbsent || appliesToServiceCodes != null) {
+      map['applies_to_service_codes'] = Variable<String>(appliesToServiceCodes);
+    }
+    map['valid_from'] = Variable<String>(validFrom);
+    if (!nullToAbsent || validTo != null) {
+      map['valid_to'] = Variable<String>(validTo);
+    }
+    map['is_active'] = Variable<bool>(isActive);
+    return map;
+  }
+
+  PromotionEntriesCompanion toCompanion(bool nullToAbsent) {
+    return PromotionEntriesCompanion(
+      id: Value(id),
+      version: Value(version),
+      syncStatus: Value(syncStatus),
+      deletedAt: deletedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(deletedAt),
+      code: Value(code),
+      name: Value(name),
+      description: description == null && nullToAbsent
+          ? const Value.absent()
+          : Value(description),
+      discountType: Value(discountType),
+      value: Value(value),
+      appliesToServiceCodes: appliesToServiceCodes == null && nullToAbsent
+          ? const Value.absent()
+          : Value(appliesToServiceCodes),
+      validFrom: Value(validFrom),
+      validTo: validTo == null && nullToAbsent
+          ? const Value.absent()
+          : Value(validTo),
+      isActive: Value(isActive),
+    );
+  }
+
+  factory PromotionEntry.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return PromotionEntry(
+      id: serializer.fromJson<String>(json['id']),
+      version: serializer.fromJson<int>(json['version']),
+      syncStatus: serializer.fromJson<String>(json['syncStatus']),
+      deletedAt: serializer.fromJson<DateTime?>(json['deletedAt']),
+      code: serializer.fromJson<String>(json['code']),
+      name: serializer.fromJson<String>(json['name']),
+      description: serializer.fromJson<String?>(json['description']),
+      discountType: serializer.fromJson<String>(json['discountType']),
+      value: serializer.fromJson<String>(json['value']),
+      appliesToServiceCodes: serializer.fromJson<String?>(
+        json['appliesToServiceCodes'],
+      ),
+      validFrom: serializer.fromJson<String>(json['validFrom']),
+      validTo: serializer.fromJson<String?>(json['validTo']),
+      isActive: serializer.fromJson<bool>(json['isActive']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'version': serializer.toJson<int>(version),
+      'syncStatus': serializer.toJson<String>(syncStatus),
+      'deletedAt': serializer.toJson<DateTime?>(deletedAt),
+      'code': serializer.toJson<String>(code),
+      'name': serializer.toJson<String>(name),
+      'description': serializer.toJson<String?>(description),
+      'discountType': serializer.toJson<String>(discountType),
+      'value': serializer.toJson<String>(value),
+      'appliesToServiceCodes': serializer.toJson<String?>(
+        appliesToServiceCodes,
+      ),
+      'validFrom': serializer.toJson<String>(validFrom),
+      'validTo': serializer.toJson<String?>(validTo),
+      'isActive': serializer.toJson<bool>(isActive),
+    };
+  }
+
+  PromotionEntry copyWith({
+    String? id,
+    int? version,
+    String? syncStatus,
+    Value<DateTime?> deletedAt = const Value.absent(),
+    String? code,
+    String? name,
+    Value<String?> description = const Value.absent(),
+    String? discountType,
+    String? value,
+    Value<String?> appliesToServiceCodes = const Value.absent(),
+    String? validFrom,
+    Value<String?> validTo = const Value.absent(),
+    bool? isActive,
+  }) => PromotionEntry(
+    id: id ?? this.id,
+    version: version ?? this.version,
+    syncStatus: syncStatus ?? this.syncStatus,
+    deletedAt: deletedAt.present ? deletedAt.value : this.deletedAt,
+    code: code ?? this.code,
+    name: name ?? this.name,
+    description: description.present ? description.value : this.description,
+    discountType: discountType ?? this.discountType,
+    value: value ?? this.value,
+    appliesToServiceCodes: appliesToServiceCodes.present
+        ? appliesToServiceCodes.value
+        : this.appliesToServiceCodes,
+    validFrom: validFrom ?? this.validFrom,
+    validTo: validTo.present ? validTo.value : this.validTo,
+    isActive: isActive ?? this.isActive,
+  );
+  PromotionEntry copyWithCompanion(PromotionEntriesCompanion data) {
+    return PromotionEntry(
+      id: data.id.present ? data.id.value : this.id,
+      version: data.version.present ? data.version.value : this.version,
+      syncStatus: data.syncStatus.present
+          ? data.syncStatus.value
+          : this.syncStatus,
+      deletedAt: data.deletedAt.present ? data.deletedAt.value : this.deletedAt,
+      code: data.code.present ? data.code.value : this.code,
+      name: data.name.present ? data.name.value : this.name,
+      description: data.description.present
+          ? data.description.value
+          : this.description,
+      discountType: data.discountType.present
+          ? data.discountType.value
+          : this.discountType,
+      value: data.value.present ? data.value.value : this.value,
+      appliesToServiceCodes: data.appliesToServiceCodes.present
+          ? data.appliesToServiceCodes.value
+          : this.appliesToServiceCodes,
+      validFrom: data.validFrom.present ? data.validFrom.value : this.validFrom,
+      validTo: data.validTo.present ? data.validTo.value : this.validTo,
+      isActive: data.isActive.present ? data.isActive.value : this.isActive,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('PromotionEntry(')
+          ..write('id: $id, ')
+          ..write('version: $version, ')
+          ..write('syncStatus: $syncStatus, ')
+          ..write('deletedAt: $deletedAt, ')
+          ..write('code: $code, ')
+          ..write('name: $name, ')
+          ..write('description: $description, ')
+          ..write('discountType: $discountType, ')
+          ..write('value: $value, ')
+          ..write('appliesToServiceCodes: $appliesToServiceCodes, ')
+          ..write('validFrom: $validFrom, ')
+          ..write('validTo: $validTo, ')
+          ..write('isActive: $isActive')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    version,
+    syncStatus,
+    deletedAt,
+    code,
+    name,
+    description,
+    discountType,
+    value,
+    appliesToServiceCodes,
+    validFrom,
+    validTo,
+    isActive,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is PromotionEntry &&
+          other.id == this.id &&
+          other.version == this.version &&
+          other.syncStatus == this.syncStatus &&
+          other.deletedAt == this.deletedAt &&
+          other.code == this.code &&
+          other.name == this.name &&
+          other.description == this.description &&
+          other.discountType == this.discountType &&
+          other.value == this.value &&
+          other.appliesToServiceCodes == this.appliesToServiceCodes &&
+          other.validFrom == this.validFrom &&
+          other.validTo == this.validTo &&
+          other.isActive == this.isActive);
+}
+
+class PromotionEntriesCompanion extends UpdateCompanion<PromotionEntry> {
+  final Value<String> id;
+  final Value<int> version;
+  final Value<String> syncStatus;
+  final Value<DateTime?> deletedAt;
+  final Value<String> code;
+  final Value<String> name;
+  final Value<String?> description;
+  final Value<String> discountType;
+  final Value<String> value;
+  final Value<String?> appliesToServiceCodes;
+  final Value<String> validFrom;
+  final Value<String?> validTo;
+  final Value<bool> isActive;
+  final Value<int> rowid;
+  const PromotionEntriesCompanion({
+    this.id = const Value.absent(),
+    this.version = const Value.absent(),
+    this.syncStatus = const Value.absent(),
+    this.deletedAt = const Value.absent(),
+    this.code = const Value.absent(),
+    this.name = const Value.absent(),
+    this.description = const Value.absent(),
+    this.discountType = const Value.absent(),
+    this.value = const Value.absent(),
+    this.appliesToServiceCodes = const Value.absent(),
+    this.validFrom = const Value.absent(),
+    this.validTo = const Value.absent(),
+    this.isActive = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  PromotionEntriesCompanion.insert({
+    required String id,
+    this.version = const Value.absent(),
+    this.syncStatus = const Value.absent(),
+    this.deletedAt = const Value.absent(),
+    required String code,
+    required String name,
+    this.description = const Value.absent(),
+    required String discountType,
+    required String value,
+    this.appliesToServiceCodes = const Value.absent(),
+    required String validFrom,
+    this.validTo = const Value.absent(),
+    this.isActive = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       code = Value(code),
+       name = Value(name),
+       discountType = Value(discountType),
+       value = Value(value),
+       validFrom = Value(validFrom);
+  static Insertable<PromotionEntry> custom({
+    Expression<String>? id,
+    Expression<int>? version,
+    Expression<String>? syncStatus,
+    Expression<DateTime>? deletedAt,
+    Expression<String>? code,
+    Expression<String>? name,
+    Expression<String>? description,
+    Expression<String>? discountType,
+    Expression<String>? value,
+    Expression<String>? appliesToServiceCodes,
+    Expression<String>? validFrom,
+    Expression<String>? validTo,
+    Expression<bool>? isActive,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (version != null) 'version': version,
+      if (syncStatus != null) 'sync_status': syncStatus,
+      if (deletedAt != null) 'deleted_at': deletedAt,
+      if (code != null) 'code': code,
+      if (name != null) 'name': name,
+      if (description != null) 'description': description,
+      if (discountType != null) 'discount_type': discountType,
+      if (value != null) 'value': value,
+      if (appliesToServiceCodes != null)
+        'applies_to_service_codes': appliesToServiceCodes,
+      if (validFrom != null) 'valid_from': validFrom,
+      if (validTo != null) 'valid_to': validTo,
+      if (isActive != null) 'is_active': isActive,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  PromotionEntriesCompanion copyWith({
+    Value<String>? id,
+    Value<int>? version,
+    Value<String>? syncStatus,
+    Value<DateTime?>? deletedAt,
+    Value<String>? code,
+    Value<String>? name,
+    Value<String?>? description,
+    Value<String>? discountType,
+    Value<String>? value,
+    Value<String?>? appliesToServiceCodes,
+    Value<String>? validFrom,
+    Value<String?>? validTo,
+    Value<bool>? isActive,
+    Value<int>? rowid,
+  }) {
+    return PromotionEntriesCompanion(
+      id: id ?? this.id,
+      version: version ?? this.version,
+      syncStatus: syncStatus ?? this.syncStatus,
+      deletedAt: deletedAt ?? this.deletedAt,
+      code: code ?? this.code,
+      name: name ?? this.name,
+      description: description ?? this.description,
+      discountType: discountType ?? this.discountType,
+      value: value ?? this.value,
+      appliesToServiceCodes:
+          appliesToServiceCodes ?? this.appliesToServiceCodes,
+      validFrom: validFrom ?? this.validFrom,
+      validTo: validTo ?? this.validTo,
+      isActive: isActive ?? this.isActive,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (version.present) {
+      map['version'] = Variable<int>(version.value);
+    }
+    if (syncStatus.present) {
+      map['sync_status'] = Variable<String>(syncStatus.value);
+    }
+    if (deletedAt.present) {
+      map['deleted_at'] = Variable<DateTime>(deletedAt.value);
+    }
+    if (code.present) {
+      map['code'] = Variable<String>(code.value);
+    }
+    if (name.present) {
+      map['name'] = Variable<String>(name.value);
+    }
+    if (description.present) {
+      map['description'] = Variable<String>(description.value);
+    }
+    if (discountType.present) {
+      map['discount_type'] = Variable<String>(discountType.value);
+    }
+    if (value.present) {
+      map['value'] = Variable<String>(value.value);
+    }
+    if (appliesToServiceCodes.present) {
+      map['applies_to_service_codes'] = Variable<String>(
+        appliesToServiceCodes.value,
+      );
+    }
+    if (validFrom.present) {
+      map['valid_from'] = Variable<String>(validFrom.value);
+    }
+    if (validTo.present) {
+      map['valid_to'] = Variable<String>(validTo.value);
+    }
+    if (isActive.present) {
+      map['is_active'] = Variable<bool>(isActive.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('PromotionEntriesCompanion(')
+          ..write('id: $id, ')
+          ..write('version: $version, ')
+          ..write('syncStatus: $syncStatus, ')
+          ..write('deletedAt: $deletedAt, ')
+          ..write('code: $code, ')
+          ..write('name: $name, ')
+          ..write('description: $description, ')
+          ..write('discountType: $discountType, ')
+          ..write('value: $value, ')
+          ..write('appliesToServiceCodes: $appliesToServiceCodes, ')
+          ..write('validFrom: $validFrom, ')
+          ..write('validTo: $validTo, ')
+          ..write('isActive: $isActive, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -9332,6 +10188,9 @@ abstract class _$AppDatabase extends GeneratedDatabase {
       $OrderDiscountEntriesTable(this);
   late final $OrderPaymentEntriesTable orderPaymentEntries =
       $OrderPaymentEntriesTable(this);
+  late final $PromotionEntriesTable promotionEntries = $PromotionEntriesTable(
+    this,
+  );
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -9351,6 +10210,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     orderChargeEntries,
     orderDiscountEntries,
     orderPaymentEntries,
+    promotionEntries,
   ];
 }
 
@@ -12118,6 +12978,7 @@ typedef $$OrderEntriesTableCreateCompanionBuilder =
       Value<DateTime?> cancelledAt,
       Value<String?> cancelledById,
       Value<String?> cancelReason,
+      Value<DateTime?> createdAt,
       Value<int> rowid,
     });
 typedef $$OrderEntriesTableUpdateCompanionBuilder =
@@ -12144,6 +13005,7 @@ typedef $$OrderEntriesTableUpdateCompanionBuilder =
       Value<DateTime?> cancelledAt,
       Value<String?> cancelledById,
       Value<String?> cancelReason,
+      Value<DateTime?> createdAt,
       Value<int> rowid,
     });
 
@@ -12263,6 +13125,11 @@ class $$OrderEntriesTableFilterComposer
 
   ColumnFilters<String> get cancelReason => $composableBuilder(
     column: $table.cancelReason,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
     builder: (column) => ColumnFilters(column),
   );
 }
@@ -12385,6 +13252,11 @@ class $$OrderEntriesTableOrderingComposer
     column: $table.cancelReason,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$OrderEntriesTableAnnotationComposer
@@ -12487,6 +13359,9 @@ class $$OrderEntriesTableAnnotationComposer
     column: $table.cancelReason,
     builder: (column) => column,
   );
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
 }
 
 class $$OrderEntriesTableTableManager
@@ -12542,6 +13417,7 @@ class $$OrderEntriesTableTableManager
                 Value<DateTime?> cancelledAt = const Value.absent(),
                 Value<String?> cancelledById = const Value.absent(),
                 Value<String?> cancelReason = const Value.absent(),
+                Value<DateTime?> createdAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => OrderEntriesCompanion(
                 id: id,
@@ -12566,6 +13442,7 @@ class $$OrderEntriesTableTableManager
                 cancelledAt: cancelledAt,
                 cancelledById: cancelledById,
                 cancelReason: cancelReason,
+                createdAt: createdAt,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -12592,6 +13469,7 @@ class $$OrderEntriesTableTableManager
                 Value<DateTime?> cancelledAt = const Value.absent(),
                 Value<String?> cancelledById = const Value.absent(),
                 Value<String?> cancelReason = const Value.absent(),
+                Value<DateTime?> createdAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => OrderEntriesCompanion.insert(
                 id: id,
@@ -12616,6 +13494,7 @@ class $$OrderEntriesTableTableManager
                 cancelledAt: cancelledAt,
                 cancelledById: cancelledById,
                 cancelReason: cancelReason,
+                createdAt: createdAt,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
@@ -13889,6 +14768,372 @@ typedef $$OrderPaymentEntriesTableProcessedTableManager =
       OrderPaymentEntry,
       PrefetchHooks Function()
     >;
+typedef $$PromotionEntriesTableCreateCompanionBuilder =
+    PromotionEntriesCompanion Function({
+      required String id,
+      Value<int> version,
+      Value<String> syncStatus,
+      Value<DateTime?> deletedAt,
+      required String code,
+      required String name,
+      Value<String?> description,
+      required String discountType,
+      required String value,
+      Value<String?> appliesToServiceCodes,
+      required String validFrom,
+      Value<String?> validTo,
+      Value<bool> isActive,
+      Value<int> rowid,
+    });
+typedef $$PromotionEntriesTableUpdateCompanionBuilder =
+    PromotionEntriesCompanion Function({
+      Value<String> id,
+      Value<int> version,
+      Value<String> syncStatus,
+      Value<DateTime?> deletedAt,
+      Value<String> code,
+      Value<String> name,
+      Value<String?> description,
+      Value<String> discountType,
+      Value<String> value,
+      Value<String?> appliesToServiceCodes,
+      Value<String> validFrom,
+      Value<String?> validTo,
+      Value<bool> isActive,
+      Value<int> rowid,
+    });
+
+class $$PromotionEntriesTableFilterComposer
+    extends Composer<_$AppDatabase, $PromotionEntriesTable> {
+  $$PromotionEntriesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get version => $composableBuilder(
+    column: $table.version,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get syncStatus => $composableBuilder(
+    column: $table.syncStatus,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get deletedAt => $composableBuilder(
+    column: $table.deletedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get code => $composableBuilder(
+    column: $table.code,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get description => $composableBuilder(
+    column: $table.description,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get discountType => $composableBuilder(
+    column: $table.discountType,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get value => $composableBuilder(
+    column: $table.value,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get appliesToServiceCodes => $composableBuilder(
+    column: $table.appliesToServiceCodes,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get validFrom => $composableBuilder(
+    column: $table.validFrom,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get validTo => $composableBuilder(
+    column: $table.validTo,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get isActive => $composableBuilder(
+    column: $table.isActive,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$PromotionEntriesTableOrderingComposer
+    extends Composer<_$AppDatabase, $PromotionEntriesTable> {
+  $$PromotionEntriesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get version => $composableBuilder(
+    column: $table.version,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get syncStatus => $composableBuilder(
+    column: $table.syncStatus,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get deletedAt => $composableBuilder(
+    column: $table.deletedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get code => $composableBuilder(
+    column: $table.code,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get description => $composableBuilder(
+    column: $table.description,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get discountType => $composableBuilder(
+    column: $table.discountType,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get value => $composableBuilder(
+    column: $table.value,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get appliesToServiceCodes => $composableBuilder(
+    column: $table.appliesToServiceCodes,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get validFrom => $composableBuilder(
+    column: $table.validFrom,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get validTo => $composableBuilder(
+    column: $table.validTo,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get isActive => $composableBuilder(
+    column: $table.isActive,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$PromotionEntriesTableAnnotationComposer
+    extends Composer<_$AppDatabase, $PromotionEntriesTable> {
+  $$PromotionEntriesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<int> get version =>
+      $composableBuilder(column: $table.version, builder: (column) => column);
+
+  GeneratedColumn<String> get syncStatus => $composableBuilder(
+    column: $table.syncStatus,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get deletedAt =>
+      $composableBuilder(column: $table.deletedAt, builder: (column) => column);
+
+  GeneratedColumn<String> get code =>
+      $composableBuilder(column: $table.code, builder: (column) => column);
+
+  GeneratedColumn<String> get name =>
+      $composableBuilder(column: $table.name, builder: (column) => column);
+
+  GeneratedColumn<String> get description => $composableBuilder(
+    column: $table.description,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get discountType => $composableBuilder(
+    column: $table.discountType,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get value =>
+      $composableBuilder(column: $table.value, builder: (column) => column);
+
+  GeneratedColumn<String> get appliesToServiceCodes => $composableBuilder(
+    column: $table.appliesToServiceCodes,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get validFrom =>
+      $composableBuilder(column: $table.validFrom, builder: (column) => column);
+
+  GeneratedColumn<String> get validTo =>
+      $composableBuilder(column: $table.validTo, builder: (column) => column);
+
+  GeneratedColumn<bool> get isActive =>
+      $composableBuilder(column: $table.isActive, builder: (column) => column);
+}
+
+class $$PromotionEntriesTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $PromotionEntriesTable,
+          PromotionEntry,
+          $$PromotionEntriesTableFilterComposer,
+          $$PromotionEntriesTableOrderingComposer,
+          $$PromotionEntriesTableAnnotationComposer,
+          $$PromotionEntriesTableCreateCompanionBuilder,
+          $$PromotionEntriesTableUpdateCompanionBuilder,
+          (
+            PromotionEntry,
+            BaseReferences<
+              _$AppDatabase,
+              $PromotionEntriesTable,
+              PromotionEntry
+            >,
+          ),
+          PromotionEntry,
+          PrefetchHooks Function()
+        > {
+  $$PromotionEntriesTableTableManager(
+    _$AppDatabase db,
+    $PromotionEntriesTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$PromotionEntriesTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$PromotionEntriesTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$PromotionEntriesTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<int> version = const Value.absent(),
+                Value<String> syncStatus = const Value.absent(),
+                Value<DateTime?> deletedAt = const Value.absent(),
+                Value<String> code = const Value.absent(),
+                Value<String> name = const Value.absent(),
+                Value<String?> description = const Value.absent(),
+                Value<String> discountType = const Value.absent(),
+                Value<String> value = const Value.absent(),
+                Value<String?> appliesToServiceCodes = const Value.absent(),
+                Value<String> validFrom = const Value.absent(),
+                Value<String?> validTo = const Value.absent(),
+                Value<bool> isActive = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => PromotionEntriesCompanion(
+                id: id,
+                version: version,
+                syncStatus: syncStatus,
+                deletedAt: deletedAt,
+                code: code,
+                name: name,
+                description: description,
+                discountType: discountType,
+                value: value,
+                appliesToServiceCodes: appliesToServiceCodes,
+                validFrom: validFrom,
+                validTo: validTo,
+                isActive: isActive,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                Value<int> version = const Value.absent(),
+                Value<String> syncStatus = const Value.absent(),
+                Value<DateTime?> deletedAt = const Value.absent(),
+                required String code,
+                required String name,
+                Value<String?> description = const Value.absent(),
+                required String discountType,
+                required String value,
+                Value<String?> appliesToServiceCodes = const Value.absent(),
+                required String validFrom,
+                Value<String?> validTo = const Value.absent(),
+                Value<bool> isActive = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => PromotionEntriesCompanion.insert(
+                id: id,
+                version: version,
+                syncStatus: syncStatus,
+                deletedAt: deletedAt,
+                code: code,
+                name: name,
+                description: description,
+                discountType: discountType,
+                value: value,
+                appliesToServiceCodes: appliesToServiceCodes,
+                validFrom: validFrom,
+                validTo: validTo,
+                isActive: isActive,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$PromotionEntriesTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $PromotionEntriesTable,
+      PromotionEntry,
+      $$PromotionEntriesTableFilterComposer,
+      $$PromotionEntriesTableOrderingComposer,
+      $$PromotionEntriesTableAnnotationComposer,
+      $$PromotionEntriesTableCreateCompanionBuilder,
+      $$PromotionEntriesTableUpdateCompanionBuilder,
+      (
+        PromotionEntry,
+        BaseReferences<_$AppDatabase, $PromotionEntriesTable, PromotionEntry>,
+      ),
+      PromotionEntry,
+      PrefetchHooks Function()
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -13921,6 +15166,8 @@ class $AppDatabaseManager {
       $$OrderDiscountEntriesTableTableManager(_db, _db.orderDiscountEntries);
   $$OrderPaymentEntriesTableTableManager get orderPaymentEntries =>
       $$OrderPaymentEntriesTableTableManager(_db, _db.orderPaymentEntries);
+  $$PromotionEntriesTableTableManager get promotionEntries =>
+      $$PromotionEntriesTableTableManager(_db, _db.promotionEntries);
 }
 
 // **************************************************************************

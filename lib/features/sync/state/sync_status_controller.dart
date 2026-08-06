@@ -20,6 +20,12 @@ Stream<int> pendingOperationsCount(Ref ref) {
   return ref.watch(syncRepositoryProvider).watchPendingCount();
 }
 
+/// Lo que espera subir, desglosado por entidad (§11.1).
+@Riverpod(keepAlive: true)
+Stream<Map<String, int>> pendingByEntity(Ref ref) {
+  return ref.watch(syncRepositoryProvider).watchPendingByEntity();
+}
+
 /// Capturas que el servidor rechazó y esperan una decisión humana (§8).
 @Riverpod(keepAlive: true)
 Stream<int> reviewQueueCount(Ref ref) {
