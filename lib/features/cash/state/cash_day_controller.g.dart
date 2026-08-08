@@ -6,66 +6,428 @@ part of 'cash_day_controller.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$cashOrderPaymentsHash() => r'81edb42607c995e89674defff6e2f3ad6383a3d5';
+String _$cashOrderPaymentsHash() => r'9604cfca51b5182fa2ef9b4c0dd05821ba50492c';
 
-/// Los cobros de pedidos del día.
+/// Copied from Dart SDK
+class _SystemHash {
+  _SystemHash._();
+
+  static int combine(int hash, int value) {
+    // ignore: parameter_assignments
+    hash = 0x1fffffff & (hash + value);
+    // ignore: parameter_assignments
+    hash = 0x1fffffff & (hash + ((0x0007ffff & hash) << 10));
+    return hash ^ (hash >> 6);
+  }
+
+  static int finish(int hash) {
+    // ignore: parameter_assignments
+    hash = 0x1fffffff & (hash + ((0x03ffffff & hash) << 3));
+    // ignore: parameter_assignments
+    hash = hash ^ (hash >> 11);
+    return 0x1fffffff & (hash + ((0x00003fff & hash) << 15));
+  }
+}
+
+/// Los cobros de pedidos de una fecha.
 ///
 /// Copied from [cashOrderPayments].
 @ProviderFor(cashOrderPayments)
-final cashOrderPaymentsProvider =
-    AutoDisposeStreamProvider<List<CashEntry>>.internal(
-      cashOrderPayments,
-      name: r'cashOrderPaymentsProvider',
-      debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
-          ? null
-          : _$cashOrderPaymentsHash,
-      dependencies: null,
-      allTransitiveDependencies: null,
+const cashOrderPaymentsProvider = CashOrderPaymentsFamily();
+
+/// Los cobros de pedidos de una fecha.
+///
+/// Copied from [cashOrderPayments].
+class CashOrderPaymentsFamily extends Family<AsyncValue<List<CashEntry>>> {
+  /// Los cobros de pedidos de una fecha.
+  ///
+  /// Copied from [cashOrderPayments].
+  const CashOrderPaymentsFamily();
+
+  /// Los cobros de pedidos de una fecha.
+  ///
+  /// Copied from [cashOrderPayments].
+  CashOrderPaymentsProvider call(String date) {
+    return CashOrderPaymentsProvider(date);
+  }
+
+  @override
+  CashOrderPaymentsProvider getProviderOverride(
+    covariant CashOrderPaymentsProvider provider,
+  ) {
+    return call(provider.date);
+  }
+
+  static const Iterable<ProviderOrFamily>? _dependencies = null;
+
+  @override
+  Iterable<ProviderOrFamily>? get dependencies => _dependencies;
+
+  static const Iterable<ProviderOrFamily>? _allTransitiveDependencies = null;
+
+  @override
+  Iterable<ProviderOrFamily>? get allTransitiveDependencies =>
+      _allTransitiveDependencies;
+
+  @override
+  String? get name => r'cashOrderPaymentsProvider';
+}
+
+/// Los cobros de pedidos de una fecha.
+///
+/// Copied from [cashOrderPayments].
+class CashOrderPaymentsProvider
+    extends AutoDisposeStreamProvider<List<CashEntry>> {
+  /// Los cobros de pedidos de una fecha.
+  ///
+  /// Copied from [cashOrderPayments].
+  CashOrderPaymentsProvider(String date)
+    : this._internal(
+        (ref) => cashOrderPayments(ref as CashOrderPaymentsRef, date),
+        from: cashOrderPaymentsProvider,
+        name: r'cashOrderPaymentsProvider',
+        debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
+            ? null
+            : _$cashOrderPaymentsHash,
+        dependencies: CashOrderPaymentsFamily._dependencies,
+        allTransitiveDependencies:
+            CashOrderPaymentsFamily._allTransitiveDependencies,
+        date: date,
+      );
+
+  CashOrderPaymentsProvider._internal(
+    super._createNotifier, {
+    required super.name,
+    required super.dependencies,
+    required super.allTransitiveDependencies,
+    required super.debugGetCreateSourceHash,
+    required super.from,
+    required this.date,
+  }) : super.internal();
+
+  final String date;
+
+  @override
+  Override overrideWith(
+    Stream<List<CashEntry>> Function(CashOrderPaymentsRef provider) create,
+  ) {
+    return ProviderOverride(
+      origin: this,
+      override: CashOrderPaymentsProvider._internal(
+        (ref) => create(ref as CashOrderPaymentsRef),
+        from: from,
+        name: null,
+        dependencies: null,
+        allTransitiveDependencies: null,
+        debugGetCreateSourceHash: null,
+        date: date,
+      ),
     );
+  }
+
+  @override
+  AutoDisposeStreamProviderElement<List<CashEntry>> createElement() {
+    return _CashOrderPaymentsProviderElement(this);
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is CashOrderPaymentsProvider && other.date == date;
+  }
+
+  @override
+  int get hashCode {
+    var hash = _SystemHash.combine(0, runtimeType.hashCode);
+    hash = _SystemHash.combine(hash, date.hashCode);
+
+    return _SystemHash.finish(hash);
+  }
+}
 
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
-typedef CashOrderPaymentsRef = AutoDisposeStreamProviderRef<List<CashEntry>>;
-String _$cashSupplySalesHash() => r'0fc5fcad7ea78f3e0870ebf1fa025834861f205b';
+mixin CashOrderPaymentsRef on AutoDisposeStreamProviderRef<List<CashEntry>> {
+  /// The parameter `date` of this provider.
+  String get date;
+}
 
-/// Las ventas de insumo del día.
+class _CashOrderPaymentsProviderElement
+    extends AutoDisposeStreamProviderElement<List<CashEntry>>
+    with CashOrderPaymentsRef {
+  _CashOrderPaymentsProviderElement(super.provider);
+
+  @override
+  String get date => (origin as CashOrderPaymentsProvider).date;
+}
+
+String _$cashSupplySalesHash() => r'40f86543dc53e5c0779dd3b2742fe7265d0d8ace';
+
+/// Las ventas de insumo de una fecha.
 ///
 /// Copied from [cashSupplySales].
 @ProviderFor(cashSupplySales)
-final cashSupplySalesProvider =
-    AutoDisposeStreamProvider<List<SupplySaleSummary>>.internal(
-      cashSupplySales,
-      name: r'cashSupplySalesProvider',
-      debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
-          ? null
-          : _$cashSupplySalesHash,
-      dependencies: null,
-      allTransitiveDependencies: null,
+const cashSupplySalesProvider = CashSupplySalesFamily();
+
+/// Las ventas de insumo de una fecha.
+///
+/// Copied from [cashSupplySales].
+class CashSupplySalesFamily
+    extends Family<AsyncValue<List<SupplySaleSummary>>> {
+  /// Las ventas de insumo de una fecha.
+  ///
+  /// Copied from [cashSupplySales].
+  const CashSupplySalesFamily();
+
+  /// Las ventas de insumo de una fecha.
+  ///
+  /// Copied from [cashSupplySales].
+  CashSupplySalesProvider call(String date) {
+    return CashSupplySalesProvider(date);
+  }
+
+  @override
+  CashSupplySalesProvider getProviderOverride(
+    covariant CashSupplySalesProvider provider,
+  ) {
+    return call(provider.date);
+  }
+
+  static const Iterable<ProviderOrFamily>? _dependencies = null;
+
+  @override
+  Iterable<ProviderOrFamily>? get dependencies => _dependencies;
+
+  static const Iterable<ProviderOrFamily>? _allTransitiveDependencies = null;
+
+  @override
+  Iterable<ProviderOrFamily>? get allTransitiveDependencies =>
+      _allTransitiveDependencies;
+
+  @override
+  String? get name => r'cashSupplySalesProvider';
+}
+
+/// Las ventas de insumo de una fecha.
+///
+/// Copied from [cashSupplySales].
+class CashSupplySalesProvider
+    extends AutoDisposeStreamProvider<List<SupplySaleSummary>> {
+  /// Las ventas de insumo de una fecha.
+  ///
+  /// Copied from [cashSupplySales].
+  CashSupplySalesProvider(String date)
+    : this._internal(
+        (ref) => cashSupplySales(ref as CashSupplySalesRef, date),
+        from: cashSupplySalesProvider,
+        name: r'cashSupplySalesProvider',
+        debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
+            ? null
+            : _$cashSupplySalesHash,
+        dependencies: CashSupplySalesFamily._dependencies,
+        allTransitiveDependencies:
+            CashSupplySalesFamily._allTransitiveDependencies,
+        date: date,
+      );
+
+  CashSupplySalesProvider._internal(
+    super._createNotifier, {
+    required super.name,
+    required super.dependencies,
+    required super.allTransitiveDependencies,
+    required super.debugGetCreateSourceHash,
+    required super.from,
+    required this.date,
+  }) : super.internal();
+
+  final String date;
+
+  @override
+  Override overrideWith(
+    Stream<List<SupplySaleSummary>> Function(CashSupplySalesRef provider)
+    create,
+  ) {
+    return ProviderOverride(
+      origin: this,
+      override: CashSupplySalesProvider._internal(
+        (ref) => create(ref as CashSupplySalesRef),
+        from: from,
+        name: null,
+        dependencies: null,
+        allTransitiveDependencies: null,
+        debugGetCreateSourceHash: null,
+        date: date,
+      ),
     );
+  }
+
+  @override
+  AutoDisposeStreamProviderElement<List<SupplySaleSummary>> createElement() {
+    return _CashSupplySalesProviderElement(this);
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is CashSupplySalesProvider && other.date == date;
+  }
+
+  @override
+  int get hashCode {
+    var hash = _SystemHash.combine(0, runtimeType.hashCode);
+    hash = _SystemHash.combine(hash, date.hashCode);
+
+    return _SystemHash.finish(hash);
+  }
+}
 
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
-typedef CashSupplySalesRef =
-    AutoDisposeStreamProviderRef<List<SupplySaleSummary>>;
-String _$cashExpensesHash() => r'5f8c98fcc1f5ea52bb78c8d7b4885bc95782f9ba';
+mixin CashSupplySalesRef
+    on AutoDisposeStreamProviderRef<List<SupplySaleSummary>> {
+  /// The parameter `date` of this provider.
+  String get date;
+}
 
-/// Los gastos del día.
+class _CashSupplySalesProviderElement
+    extends AutoDisposeStreamProviderElement<List<SupplySaleSummary>>
+    with CashSupplySalesRef {
+  _CashSupplySalesProviderElement(super.provider);
+
+  @override
+  String get date => (origin as CashSupplySalesProvider).date;
+}
+
+String _$cashExpensesHash() => r'14edbd17b8e9652ab7dd95cd171fb28eee631283';
+
+/// Los gastos de una fecha.
 ///
 /// Copied from [cashExpenses].
 @ProviderFor(cashExpenses)
-final cashExpensesProvider = AutoDisposeStreamProvider<List<Expense>>.internal(
-  cashExpenses,
-  name: r'cashExpensesProvider',
-  debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
-      ? null
-      : _$cashExpensesHash,
-  dependencies: null,
-  allTransitiveDependencies: null,
-);
+const cashExpensesProvider = CashExpensesFamily();
+
+/// Los gastos de una fecha.
+///
+/// Copied from [cashExpenses].
+class CashExpensesFamily extends Family<AsyncValue<List<Expense>>> {
+  /// Los gastos de una fecha.
+  ///
+  /// Copied from [cashExpenses].
+  const CashExpensesFamily();
+
+  /// Los gastos de una fecha.
+  ///
+  /// Copied from [cashExpenses].
+  CashExpensesProvider call(String date) {
+    return CashExpensesProvider(date);
+  }
+
+  @override
+  CashExpensesProvider getProviderOverride(
+    covariant CashExpensesProvider provider,
+  ) {
+    return call(provider.date);
+  }
+
+  static const Iterable<ProviderOrFamily>? _dependencies = null;
+
+  @override
+  Iterable<ProviderOrFamily>? get dependencies => _dependencies;
+
+  static const Iterable<ProviderOrFamily>? _allTransitiveDependencies = null;
+
+  @override
+  Iterable<ProviderOrFamily>? get allTransitiveDependencies =>
+      _allTransitiveDependencies;
+
+  @override
+  String? get name => r'cashExpensesProvider';
+}
+
+/// Los gastos de una fecha.
+///
+/// Copied from [cashExpenses].
+class CashExpensesProvider extends AutoDisposeStreamProvider<List<Expense>> {
+  /// Los gastos de una fecha.
+  ///
+  /// Copied from [cashExpenses].
+  CashExpensesProvider(String date)
+    : this._internal(
+        (ref) => cashExpenses(ref as CashExpensesRef, date),
+        from: cashExpensesProvider,
+        name: r'cashExpensesProvider',
+        debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
+            ? null
+            : _$cashExpensesHash,
+        dependencies: CashExpensesFamily._dependencies,
+        allTransitiveDependencies:
+            CashExpensesFamily._allTransitiveDependencies,
+        date: date,
+      );
+
+  CashExpensesProvider._internal(
+    super._createNotifier, {
+    required super.name,
+    required super.dependencies,
+    required super.allTransitiveDependencies,
+    required super.debugGetCreateSourceHash,
+    required super.from,
+    required this.date,
+  }) : super.internal();
+
+  final String date;
+
+  @override
+  Override overrideWith(
+    Stream<List<Expense>> Function(CashExpensesRef provider) create,
+  ) {
+    return ProviderOverride(
+      origin: this,
+      override: CashExpensesProvider._internal(
+        (ref) => create(ref as CashExpensesRef),
+        from: from,
+        name: null,
+        dependencies: null,
+        allTransitiveDependencies: null,
+        debugGetCreateSourceHash: null,
+        date: date,
+      ),
+    );
+  }
+
+  @override
+  AutoDisposeStreamProviderElement<List<Expense>> createElement() {
+    return _CashExpensesProviderElement(this);
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is CashExpensesProvider && other.date == date;
+  }
+
+  @override
+  int get hashCode {
+    var hash = _SystemHash.combine(0, runtimeType.hashCode);
+    hash = _SystemHash.combine(hash, date.hashCode);
+
+    return _SystemHash.finish(hash);
+  }
+}
 
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
-typedef CashExpensesRef = AutoDisposeStreamProviderRef<List<Expense>>;
+mixin CashExpensesRef on AutoDisposeStreamProviderRef<List<Expense>> {
+  /// The parameter `date` of this provider.
+  String get date;
+}
+
+class _CashExpensesProviderElement
+    extends AutoDisposeStreamProviderElement<List<Expense>>
+    with CashExpensesRef {
+  _CashExpensesProviderElement(super.provider);
+
+  @override
+  String get date => (origin as CashExpensesProvider).date;
+}
+
 String _$cashExpensesCategoriesHash() =>
     r'2af98f46814c733fc756e5711530a0752a745a02';
 
@@ -92,26 +454,138 @@ final cashExpensesCategoriesProvider =
 // ignore: unused_element
 typedef CashExpensesCategoriesRef =
     AutoDisposeStreamProviderRef<List<ExpenseCategory>>;
-String _$cashClosureHash() => r'92991c6763f3d12e10b1e3b611c9d916e00abf56';
+String _$cashClosureHash() => r'3f1d89c9722988dd97e61b4bc5e045ee578b3118';
 
 /// El acta, si la fecha ya se cerró.
 ///
 /// Copied from [cashClosure].
 @ProviderFor(cashClosure)
-final cashClosureProvider = AutoDisposeStreamProvider<DayClosure?>.internal(
-  cashClosure,
-  name: r'cashClosureProvider',
-  debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
-      ? null
-      : _$cashClosureHash,
-  dependencies: null,
-  allTransitiveDependencies: null,
-);
+const cashClosureProvider = CashClosureFamily();
+
+/// El acta, si la fecha ya se cerró.
+///
+/// Copied from [cashClosure].
+class CashClosureFamily extends Family<AsyncValue<DayClosure?>> {
+  /// El acta, si la fecha ya se cerró.
+  ///
+  /// Copied from [cashClosure].
+  const CashClosureFamily();
+
+  /// El acta, si la fecha ya se cerró.
+  ///
+  /// Copied from [cashClosure].
+  CashClosureProvider call(String date) {
+    return CashClosureProvider(date);
+  }
+
+  @override
+  CashClosureProvider getProviderOverride(
+    covariant CashClosureProvider provider,
+  ) {
+    return call(provider.date);
+  }
+
+  static const Iterable<ProviderOrFamily>? _dependencies = null;
+
+  @override
+  Iterable<ProviderOrFamily>? get dependencies => _dependencies;
+
+  static const Iterable<ProviderOrFamily>? _allTransitiveDependencies = null;
+
+  @override
+  Iterable<ProviderOrFamily>? get allTransitiveDependencies =>
+      _allTransitiveDependencies;
+
+  @override
+  String? get name => r'cashClosureProvider';
+}
+
+/// El acta, si la fecha ya se cerró.
+///
+/// Copied from [cashClosure].
+class CashClosureProvider extends AutoDisposeStreamProvider<DayClosure?> {
+  /// El acta, si la fecha ya se cerró.
+  ///
+  /// Copied from [cashClosure].
+  CashClosureProvider(String date)
+    : this._internal(
+        (ref) => cashClosure(ref as CashClosureRef, date),
+        from: cashClosureProvider,
+        name: r'cashClosureProvider',
+        debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
+            ? null
+            : _$cashClosureHash,
+        dependencies: CashClosureFamily._dependencies,
+        allTransitiveDependencies: CashClosureFamily._allTransitiveDependencies,
+        date: date,
+      );
+
+  CashClosureProvider._internal(
+    super._createNotifier, {
+    required super.name,
+    required super.dependencies,
+    required super.allTransitiveDependencies,
+    required super.debugGetCreateSourceHash,
+    required super.from,
+    required this.date,
+  }) : super.internal();
+
+  final String date;
+
+  @override
+  Override overrideWith(
+    Stream<DayClosure?> Function(CashClosureRef provider) create,
+  ) {
+    return ProviderOverride(
+      origin: this,
+      override: CashClosureProvider._internal(
+        (ref) => create(ref as CashClosureRef),
+        from: from,
+        name: null,
+        dependencies: null,
+        allTransitiveDependencies: null,
+        debugGetCreateSourceHash: null,
+        date: date,
+      ),
+    );
+  }
+
+  @override
+  AutoDisposeStreamProviderElement<DayClosure?> createElement() {
+    return _CashClosureProviderElement(this);
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is CashClosureProvider && other.date == date;
+  }
+
+  @override
+  int get hashCode {
+    var hash = _SystemHash.combine(0, runtimeType.hashCode);
+    hash = _SystemHash.combine(hash, date.hashCode);
+
+    return _SystemHash.finish(hash);
+  }
+}
 
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
-typedef CashClosureRef = AutoDisposeStreamProviderRef<DayClosure?>;
-String _$cashDayHash() => r'12d89aba9cc24a78fbded36aa955631c1a77801b';
+mixin CashClosureRef on AutoDisposeStreamProviderRef<DayClosure?> {
+  /// The parameter `date` of this provider.
+  String get date;
+}
+
+class _CashClosureProviderElement
+    extends AutoDisposeStreamProviderElement<DayClosure?>
+    with CashClosureRef {
+  _CashClosureProviderElement(super.provider);
+
+  @override
+  String get date => (origin as CashClosureProvider).date;
+}
+
+String _$cashDayHash() => r'c4d386554aa231df35881329eabd3a1c1df31fda';
 
 /// El día entero, armado de sus cuatro fuentes.
 ///
@@ -119,45 +593,202 @@ String _$cashDayHash() => r'12d89aba9cc24a78fbded36aa955631c1a77801b';
 /// pueden unir con sentido: un cobro, una venta y un gasto no comparten ni
 /// columnas ni fecha de corte. Cada una llega en vivo y la suma se rehace sola.
 ///
+/// Recibe la fecha en vez de leer el filtro de la pantalla: la Caja mira el día
+/// que alguien eligió con el calendario, Inicio siempre mira hoy y el cierre
+/// mira la fecha que se está cerrando. Atarlo al filtro haría que abrir el
+/// calendario en Caja cambiara las cifras de Inicio.
+///
 /// Copied from [cashDay].
 @ProviderFor(cashDay)
-final cashDayProvider = AutoDisposeProvider<CashDay>.internal(
-  cashDay,
-  name: r'cashDayProvider',
+const cashDayProvider = CashDayFamily();
+
+/// El día entero, armado de sus cuatro fuentes.
+///
+/// Se compone aquí y no en una consulta porque son cuatro tablas que no se
+/// pueden unir con sentido: un cobro, una venta y un gasto no comparten ni
+/// columnas ni fecha de corte. Cada una llega en vivo y la suma se rehace sola.
+///
+/// Recibe la fecha en vez de leer el filtro de la pantalla: la Caja mira el día
+/// que alguien eligió con el calendario, Inicio siempre mira hoy y el cierre
+/// mira la fecha que se está cerrando. Atarlo al filtro haría que abrir el
+/// calendario en Caja cambiara las cifras de Inicio.
+///
+/// Copied from [cashDay].
+class CashDayFamily extends Family<CashDay> {
+  /// El día entero, armado de sus cuatro fuentes.
+  ///
+  /// Se compone aquí y no en una consulta porque son cuatro tablas que no se
+  /// pueden unir con sentido: un cobro, una venta y un gasto no comparten ni
+  /// columnas ni fecha de corte. Cada una llega en vivo y la suma se rehace sola.
+  ///
+  /// Recibe la fecha en vez de leer el filtro de la pantalla: la Caja mira el día
+  /// que alguien eligió con el calendario, Inicio siempre mira hoy y el cierre
+  /// mira la fecha que se está cerrando. Atarlo al filtro haría que abrir el
+  /// calendario en Caja cambiara las cifras de Inicio.
+  ///
+  /// Copied from [cashDay].
+  const CashDayFamily();
+
+  /// El día entero, armado de sus cuatro fuentes.
+  ///
+  /// Se compone aquí y no en una consulta porque son cuatro tablas que no se
+  /// pueden unir con sentido: un cobro, una venta y un gasto no comparten ni
+  /// columnas ni fecha de corte. Cada una llega en vivo y la suma se rehace sola.
+  ///
+  /// Recibe la fecha en vez de leer el filtro de la pantalla: la Caja mira el día
+  /// que alguien eligió con el calendario, Inicio siempre mira hoy y el cierre
+  /// mira la fecha que se está cerrando. Atarlo al filtro haría que abrir el
+  /// calendario en Caja cambiara las cifras de Inicio.
+  ///
+  /// Copied from [cashDay].
+  CashDayProvider call(String date) {
+    return CashDayProvider(date);
+  }
+
+  @override
+  CashDayProvider getProviderOverride(covariant CashDayProvider provider) {
+    return call(provider.date);
+  }
+
+  static const Iterable<ProviderOrFamily>? _dependencies = null;
+
+  @override
+  Iterable<ProviderOrFamily>? get dependencies => _dependencies;
+
+  static const Iterable<ProviderOrFamily>? _allTransitiveDependencies = null;
+
+  @override
+  Iterable<ProviderOrFamily>? get allTransitiveDependencies =>
+      _allTransitiveDependencies;
+
+  @override
+  String? get name => r'cashDayProvider';
+}
+
+/// El día entero, armado de sus cuatro fuentes.
+///
+/// Se compone aquí y no en una consulta porque son cuatro tablas que no se
+/// pueden unir con sentido: un cobro, una venta y un gasto no comparten ni
+/// columnas ni fecha de corte. Cada una llega en vivo y la suma se rehace sola.
+///
+/// Recibe la fecha en vez de leer el filtro de la pantalla: la Caja mira el día
+/// que alguien eligió con el calendario, Inicio siempre mira hoy y el cierre
+/// mira la fecha que se está cerrando. Atarlo al filtro haría que abrir el
+/// calendario en Caja cambiara las cifras de Inicio.
+///
+/// Copied from [cashDay].
+class CashDayProvider extends AutoDisposeProvider<CashDay> {
+  /// El día entero, armado de sus cuatro fuentes.
+  ///
+  /// Se compone aquí y no en una consulta porque son cuatro tablas que no se
+  /// pueden unir con sentido: un cobro, una venta y un gasto no comparten ni
+  /// columnas ni fecha de corte. Cada una llega en vivo y la suma se rehace sola.
+  ///
+  /// Recibe la fecha en vez de leer el filtro de la pantalla: la Caja mira el día
+  /// que alguien eligió con el calendario, Inicio siempre mira hoy y el cierre
+  /// mira la fecha que se está cerrando. Atarlo al filtro haría que abrir el
+  /// calendario en Caja cambiara las cifras de Inicio.
+  ///
+  /// Copied from [cashDay].
+  CashDayProvider(String date)
+    : this._internal(
+        (ref) => cashDay(ref as CashDayRef, date),
+        from: cashDayProvider,
+        name: r'cashDayProvider',
+        debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
+            ? null
+            : _$cashDayHash,
+        dependencies: CashDayFamily._dependencies,
+        allTransitiveDependencies: CashDayFamily._allTransitiveDependencies,
+        date: date,
+      );
+
+  CashDayProvider._internal(
+    super._createNotifier, {
+    required super.name,
+    required super.dependencies,
+    required super.allTransitiveDependencies,
+    required super.debugGetCreateSourceHash,
+    required super.from,
+    required this.date,
+  }) : super.internal();
+
+  final String date;
+
+  @override
+  Override overrideWith(CashDay Function(CashDayRef provider) create) {
+    return ProviderOverride(
+      origin: this,
+      override: CashDayProvider._internal(
+        (ref) => create(ref as CashDayRef),
+        from: from,
+        name: null,
+        dependencies: null,
+        allTransitiveDependencies: null,
+        debugGetCreateSourceHash: null,
+        date: date,
+      ),
+    );
+  }
+
+  @override
+  AutoDisposeProviderElement<CashDay> createElement() {
+    return _CashDayProviderElement(this);
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is CashDayProvider && other.date == date;
+  }
+
+  @override
+  int get hashCode {
+    var hash = _SystemHash.combine(0, runtimeType.hashCode);
+    hash = _SystemHash.combine(hash, date.hashCode);
+
+    return _SystemHash.finish(hash);
+  }
+}
+
+@Deprecated('Will be removed in 3.0. Use Ref instead')
+// ignore: unused_element
+mixin CashDayRef on AutoDisposeProviderRef<CashDay> {
+  /// The parameter `date` of this provider.
+  String get date;
+}
+
+class _CashDayProviderElement extends AutoDisposeProviderElement<CashDay>
+    with CashDayRef {
+  _CashDayProviderElement(super.provider);
+
+  @override
+  String get date => (origin as CashDayProvider).date;
+}
+
+String _$selectedCashDayHash() => r'f411e798e57c39e56736b0385f516c70dc2f5acc';
+
+/// El día que la pantalla de Caja está mirando: [cashDay] con la fecha del chip.
+///
+/// De aquí sale el candado del §14 —un día cerrado se lee, no se escribe—. La
+/// comprobación de verdad la hace el servidor, porque el candado vive en sus
+/// services (plan 0005 D9); esto es para no ofrecer un botón que va a terminar
+/// en la cola de revisión con el papel ya firmado.
+///
+/// Copied from [selectedCashDay].
+@ProviderFor(selectedCashDay)
+final selectedCashDayProvider = AutoDisposeProvider<CashDay>.internal(
+  selectedCashDay,
+  name: r'selectedCashDayProvider',
   debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
       ? null
-      : _$cashDayHash,
+      : _$selectedCashDayHash,
   dependencies: null,
   allTransitiveDependencies: null,
 );
 
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
-typedef CashDayRef = AutoDisposeProviderRef<CashDay>;
-String _$cashDayIsLockedHash() => r'929f1dc1a8791b4fb1d50ae7b6c50d61b858fbce';
-
-/// Si la fecha que se está mirando admite escrituras.
-///
-/// Es el candado del §14: un día cerrado se lee, no se escribe. La comprobación
-/// de verdad la hace el servidor —el candado vive en sus services (plan 0005
-/// D9)— y esto es para no ofrecer un botón que va a terminar en la cola de
-/// revisión con el papel ya firmado.
-///
-/// Copied from [cashDayIsLocked].
-@ProviderFor(cashDayIsLocked)
-final cashDayIsLockedProvider = AutoDisposeProvider<bool>.internal(
-  cashDayIsLocked,
-  name: r'cashDayIsLockedProvider',
-  debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
-      ? null
-      : _$cashDayIsLockedHash,
-  dependencies: null,
-  allTransitiveDependencies: null,
-);
-
-@Deprecated('Will be removed in 3.0. Use Ref instead')
-// ignore: unused_element
-typedef CashDayIsLockedRef = AutoDisposeProviderRef<bool>;
+typedef SelectedCashDayRef = AutoDisposeProviderRef<CashDay>;
 String _$cashDateFilterHash() => r'1f9f62fc335fd8fddbc2da686673fda323861152';
 
 /// El día que la Caja está mirando. Por omisión el de negocio (plan 0001 D8): a

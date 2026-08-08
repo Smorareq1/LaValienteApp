@@ -6,14 +6,189 @@ part of 'orders_controller.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$ordersForDayHash() => r'7311ce475ec831d22e5ccd9f5cae68ea4bc87888';
+String _$ordersOnHash() => r'59a3b1f47b51d09ee8d69fe297e80d7ceceef610';
 
-/// Los pedidos del día elegido, tal como están en la BD local.
+/// Copied from Dart SDK
+class _SystemHash {
+  _SystemHash._();
+
+  static int combine(int hash, int value) {
+    // ignore: parameter_assignments
+    hash = 0x1fffffff & (hash + value);
+    // ignore: parameter_assignments
+    hash = 0x1fffffff & (hash + ((0x0007ffff & hash) << 10));
+    return hash ^ (hash >> 6);
+  }
+
+  static int finish(int hash) {
+    // ignore: parameter_assignments
+    hash = 0x1fffffff & (hash + ((0x03ffffff & hash) << 3));
+    // ignore: parameter_assignments
+    hash = hash ^ (hash >> 11);
+    return 0x1fffffff & (hash + ((0x00003fff & hash) << 15));
+  }
+}
+
+/// Los pedidos de una fecha cualquiera, tal como están en la BD local.
+///
+/// Va por fecha y no por el filtro de la lista porque hay dos pantallas más que
+/// preguntan por un día que nadie eligió: Inicio siempre habla de hoy, y el
+/// cierre del día habla de la fecha que se está cerrando.
+///
+/// Copied from [ordersOn].
+@ProviderFor(ordersOn)
+const ordersOnProvider = OrdersOnFamily();
+
+/// Los pedidos de una fecha cualquiera, tal como están en la BD local.
+///
+/// Va por fecha y no por el filtro de la lista porque hay dos pantallas más que
+/// preguntan por un día que nadie eligió: Inicio siempre habla de hoy, y el
+/// cierre del día habla de la fecha que se está cerrando.
+///
+/// Copied from [ordersOn].
+class OrdersOnFamily extends Family<AsyncValue<List<OrderListItem>>> {
+  /// Los pedidos de una fecha cualquiera, tal como están en la BD local.
+  ///
+  /// Va por fecha y no por el filtro de la lista porque hay dos pantallas más que
+  /// preguntan por un día que nadie eligió: Inicio siempre habla de hoy, y el
+  /// cierre del día habla de la fecha que se está cerrando.
+  ///
+  /// Copied from [ordersOn].
+  const OrdersOnFamily();
+
+  /// Los pedidos de una fecha cualquiera, tal como están en la BD local.
+  ///
+  /// Va por fecha y no por el filtro de la lista porque hay dos pantallas más que
+  /// preguntan por un día que nadie eligió: Inicio siempre habla de hoy, y el
+  /// cierre del día habla de la fecha que se está cerrando.
+  ///
+  /// Copied from [ordersOn].
+  OrdersOnProvider call(String date) {
+    return OrdersOnProvider(date);
+  }
+
+  @override
+  OrdersOnProvider getProviderOverride(covariant OrdersOnProvider provider) {
+    return call(provider.date);
+  }
+
+  static const Iterable<ProviderOrFamily>? _dependencies = null;
+
+  @override
+  Iterable<ProviderOrFamily>? get dependencies => _dependencies;
+
+  static const Iterable<ProviderOrFamily>? _allTransitiveDependencies = null;
+
+  @override
+  Iterable<ProviderOrFamily>? get allTransitiveDependencies =>
+      _allTransitiveDependencies;
+
+  @override
+  String? get name => r'ordersOnProvider';
+}
+
+/// Los pedidos de una fecha cualquiera, tal como están en la BD local.
+///
+/// Va por fecha y no por el filtro de la lista porque hay dos pantallas más que
+/// preguntan por un día que nadie eligió: Inicio siempre habla de hoy, y el
+/// cierre del día habla de la fecha que se está cerrando.
+///
+/// Copied from [ordersOn].
+class OrdersOnProvider extends AutoDisposeStreamProvider<List<OrderListItem>> {
+  /// Los pedidos de una fecha cualquiera, tal como están en la BD local.
+  ///
+  /// Va por fecha y no por el filtro de la lista porque hay dos pantallas más que
+  /// preguntan por un día que nadie eligió: Inicio siempre habla de hoy, y el
+  /// cierre del día habla de la fecha que se está cerrando.
+  ///
+  /// Copied from [ordersOn].
+  OrdersOnProvider(String date)
+    : this._internal(
+        (ref) => ordersOn(ref as OrdersOnRef, date),
+        from: ordersOnProvider,
+        name: r'ordersOnProvider',
+        debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
+            ? null
+            : _$ordersOnHash,
+        dependencies: OrdersOnFamily._dependencies,
+        allTransitiveDependencies: OrdersOnFamily._allTransitiveDependencies,
+        date: date,
+      );
+
+  OrdersOnProvider._internal(
+    super._createNotifier, {
+    required super.name,
+    required super.dependencies,
+    required super.allTransitiveDependencies,
+    required super.debugGetCreateSourceHash,
+    required super.from,
+    required this.date,
+  }) : super.internal();
+
+  final String date;
+
+  @override
+  Override overrideWith(
+    Stream<List<OrderListItem>> Function(OrdersOnRef provider) create,
+  ) {
+    return ProviderOverride(
+      origin: this,
+      override: OrdersOnProvider._internal(
+        (ref) => create(ref as OrdersOnRef),
+        from: from,
+        name: null,
+        dependencies: null,
+        allTransitiveDependencies: null,
+        debugGetCreateSourceHash: null,
+        date: date,
+      ),
+    );
+  }
+
+  @override
+  AutoDisposeStreamProviderElement<List<OrderListItem>> createElement() {
+    return _OrdersOnProviderElement(this);
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is OrdersOnProvider && other.date == date;
+  }
+
+  @override
+  int get hashCode {
+    var hash = _SystemHash.combine(0, runtimeType.hashCode);
+    hash = _SystemHash.combine(hash, date.hashCode);
+
+    return _SystemHash.finish(hash);
+  }
+}
+
+@Deprecated('Will be removed in 3.0. Use Ref instead')
+// ignore: unused_element
+mixin OrdersOnRef on AutoDisposeStreamProviderRef<List<OrderListItem>> {
+  /// The parameter `date` of this provider.
+  String get date;
+}
+
+class _OrdersOnProviderElement
+    extends AutoDisposeStreamProviderElement<List<OrderListItem>>
+    with OrdersOnRef {
+  _OrdersOnProviderElement(super.provider);
+
+  @override
+  String get date => (origin as OrdersOnProvider).date;
+}
+
+String _$ordersForDayHash() => r'9a7dacd7c0e92aeb069587ca7744c18dc2be0f5a';
+
+/// Los pedidos del día elegido en la lista, que es [ordersOn] con la fecha que
+/// el chip de la pantalla tenga puesta.
 ///
 /// Copied from [ordersForDay].
 @ProviderFor(ordersForDay)
 final ordersForDayProvider =
-    AutoDisposeStreamProvider<List<OrderListItem>>.internal(
+    AutoDisposeProvider<AsyncValue<List<OrderListItem>>>.internal(
       ordersForDay,
       name: r'ordersForDayProvider',
       debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
@@ -25,7 +200,8 @@ final ordersForDayProvider =
 
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
-typedef OrdersForDayRef = AutoDisposeStreamProviderRef<List<OrderListItem>>;
+typedef OrdersForDayRef =
+    AutoDisposeProviderRef<AsyncValue<List<OrderListItem>>>;
 String _$filteredOrdersHash() => r'20a78ed2c09fda4bd530faab4a2a9f02130ea28c';
 
 /// Los del día, ya pasados por los filtros de estado y búsqueda.
@@ -72,27 +248,6 @@ final listedTotalProvider = AutoDisposeProvider<int>.internal(
 // ignore: unused_element
 typedef ListedTotalRef = AutoDisposeProviderRef<int>;
 String _$orderDetailHash() => r'a46a8361d922536b4e3487b8c8dc40dbc8dbdd4a';
-
-/// Copied from Dart SDK
-class _SystemHash {
-  _SystemHash._();
-
-  static int combine(int hash, int value) {
-    // ignore: parameter_assignments
-    hash = 0x1fffffff & (hash + value);
-    // ignore: parameter_assignments
-    hash = 0x1fffffff & (hash + ((0x0007ffff & hash) << 10));
-    return hash ^ (hash >> 6);
-  }
-
-  static int finish(int hash) {
-    // ignore: parameter_assignments
-    hash = 0x1fffffff & (hash + ((0x03ffffff & hash) << 3));
-    // ignore: parameter_assignments
-    hash = hash ^ (hash >> 11);
-    return 0x1fffffff & (hash + ((0x00003fff & hash) << 15));
-  }
-}
 
 /// El detalle de un pedido, en vivo: cobrar o entregar redibuja la pantalla sin
 /// que nadie tenga que refrescar.

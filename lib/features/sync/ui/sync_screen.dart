@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/time/relative_time.dart';
 import '../../shell/ui/widgets/gradient_header.dart';
 import '../data/sync_repository.dart';
 import '../models/sync_details.dart';
@@ -170,7 +171,7 @@ class _Header extends StatelessWidget {
           ),
           if (status.lastSyncedAt != null)
             Text(
-              _relative(status.lastSyncedAt!),
+              relativeAge(status.lastSyncedAt!),
               style: AppTypography.bodySm.copyWith(
                 fontSize: 11.5,
                 fontWeight: FontWeight.w700,
@@ -307,7 +308,7 @@ class _Diagnostics extends StatelessWidget {
         _Row(label: 'Cursor del feed', value: '${data.pullCursor}'),
         _Row(
           label: 'Último ciclo',
-          value: data.lastCycleAt == null ? 'Nunca' : _relative(data.lastCycleAt!),
+          value: data.lastCycleAt == null ? 'Nunca' : relativeAge(data.lastCycleAt!),
         ),
         if (skew != null)
           _Row(
@@ -361,14 +362,6 @@ class _Row extends StatelessWidget {
       ),
     );
   }
-}
-
-String _relative(DateTime moment) {
-  final elapsed = DateTime.now().difference(moment);
-  if (elapsed.inSeconds < 60) return 'hace un momento';
-  if (elapsed.inMinutes < 60) return 'hace ${elapsed.inMinutes} min';
-  if (elapsed.inHours < 24) return 'hace ${elapsed.inHours} h';
-  return 'hace ${elapsed.inDays} d';
 }
 
 String _relativeFuture(DateTime moment) {

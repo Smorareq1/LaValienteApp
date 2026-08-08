@@ -263,9 +263,11 @@ class ReviewItem {
   static String _methodLabel(Object? wire) =>
       wire == 'transfer' ? 'Transferencia' : 'Efectivo';
 
+  // Los códigos son los de `OrderStatus.wire` y los del backend: `in_progress`
+  // con g, que es como lo escribe `OrderStatus.IN_PROGRESS`.
   static String _statusLabel(Object? wire) => switch (wire) {
     'received' => 'recibido',
-    'in_process' => 'en proceso',
+    'in_progress' => 'en proceso',
     'ready' => 'listo',
     'delivered' => 'entregado',
     'cancelled' => 'anulado',

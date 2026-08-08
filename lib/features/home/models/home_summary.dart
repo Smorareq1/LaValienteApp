@@ -19,10 +19,12 @@ class ReadyOrder {
 
   final String customerName;
   final int pieces;
-  final double total;
+
+  /// En centavos, como en todo lo demás que es dinero.
+  final int total;
 
   /// Saldo pendiente; `0` si está pagado.
-  final double balance;
+  final int balance;
 
   /// Hora de recepción ya formateada para mostrar.
   final String? receivedAtLabel;
@@ -34,6 +36,12 @@ class ReadyOrder {
 }
 
 /// Todo lo que la pantalla Inicio necesita para responder "¿cómo va el día?".
+///
+/// Se arma entero contra la BD local (plan 0004 D1): las cifras son las mismas
+/// que la Caja suma para el día de hoy y los contadores salen de los pedidos con
+/// fecha de hoy. Que no dependa de la red es el punto — Inicio es la primera
+/// pantalla que se abre en la mañana, y muchas veces antes de que el primer
+/// pull termine.
 class HomeSummary {
   const HomeSummary({
     required this.collectedToday,
@@ -64,15 +72,15 @@ class HomeSummary {
           readyOrders: const [],
         );
 
-  /// Cobrado en el día (pedidos + ventas de insumo).
-  final double collectedToday;
-  final double collectedCash;
-  final double collectedTransfer;
+  /// Cobrado en el día (pedidos + ventas de insumo), en centavos.
+  final int collectedToday;
+  final int collectedCash;
+  final int collectedTransfer;
 
-  final double expensesToday;
+  final int expensesToday;
 
   /// Saldo por cobrar de los pedidos del día.
-  final double receivable;
+  final int receivable;
 
   final int receivedCount;
   final int inProcessCount;

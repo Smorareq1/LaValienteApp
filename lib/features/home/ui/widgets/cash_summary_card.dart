@@ -1,6 +1,7 @@
 import 'package:design_system/design_system.dart';
 import 'package:flutter/material.dart';
 
+import '../../../../core/money/fixed2.dart';
 import '../../models/home_summary.dart';
 
 /// Tarjeta "Caja al momento": lo cobrado hasta ahora, cómo se reparte entre
@@ -43,7 +44,10 @@ class CashSummaryCard extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 2),
-                    AppMoneyText(summary.collectedToday, size: AppMoneySize.hero),
+                    AppMoneyText(
+                      Fixed2.toDouble(summary.collectedToday),
+                      size: AppMoneySize.hero,
+                    ),
                   ],
                 ),
               ),
@@ -172,7 +176,9 @@ class _SplitLegend extends StatelessWidget {
 
   final Color color;
   final String label;
-  final double amount;
+
+  /// En centavos.
+  final int amount;
 
   /// Alinea la leyenda a la derecha (la de transferencia).
   final bool alignEnd;
@@ -192,7 +198,7 @@ class _SplitLegend extends StatelessWidget {
         // Con montos largos el texto se recorta en vez de desbordar la tarjeta.
         Flexible(
           child: Text(
-            '$label ${AppMoneyText.format(amount, showDecimals: false)}',
+            '$label ${AppMoneyText.format(Fixed2.toDouble(amount), showDecimals: false)}',
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: AppTypography.helper.copyWith(
@@ -217,7 +223,9 @@ class _MiniStat extends StatelessWidget {
   });
 
   final String label;
-  final double amount;
+
+  /// En centavos, como todo el dinero de la app.
+  final int amount;
   final Color background;
   final Color labelColor;
   final Color amountColor;
@@ -242,7 +250,11 @@ class _MiniStat extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 2),
-          AppMoneyText(amount, size: AppMoneySize.md, color: amountColor),
+          AppMoneyText(
+            Fixed2.toDouble(amount),
+            size: AppMoneySize.md,
+            color: amountColor,
+          ),
         ],
       ),
     );

@@ -10,6 +10,8 @@ import '../../features/auth/ui/login_screen.dart';
 import '../../features/auth/ui/reset_password_screen.dart';
 import '../../features/auth/ui/splash_screen.dart';
 import '../../features/cash/ui/cash_screen.dart';
+import '../../features/cash/ui/close_history_screen.dart';
+import '../../features/cash/ui/day_close_screen.dart';
 import '../../features/cash/ui/supply_sale_screen.dart';
 import '../../features/customers/ui/customer_detail_screen.dart';
 import '../../features/customers/ui/customers_screen.dart';
@@ -46,7 +48,11 @@ const Map<String, List<String>> _routePermissions = {
   '/cash': [AppPermissions.expensesRead],
   // Se evalúa además del de `/cash`: vender un insumo supone poder ver la caja.
   SupplySaleScreen.path: [AppPermissions.supplySalesCreate],
-  '/cash/history': [AppPermissions.dailyCloseRead],
+  // Leer el acta, no firmarla: cerrar y reabrir piden su permiso en el botón,
+  // porque el colaborador sí necesita las cifras del día para cuadrar el cajón
+  // (§13, y por eso `daily_close.read` es suyo por omisión en el catálogo).
+  DayCloseScreen.path: [AppPermissions.dailyCloseRead],
+  CloseHistoryScreen.path: [AppPermissions.dailyCloseRead],
   '/inventory': [AppPermissions.inventoryRead],
   '/staff': [AppPermissions.attendanceRecord, AppPermissions.staffRead],
   '/catalog': [AppPermissions.catalogManage],
@@ -61,12 +67,6 @@ final List<RouteBase> _pendingModules = [
     (path: '/inventory', title: 'Insumos', icon: Icons.inventory_2_outlined, phase: 'UI 7'),
     (path: '/staff', title: 'Personal', icon: Icons.badge_outlined, phase: 'UI 7'),
     (path: '/catalog', title: 'Catálogo', icon: Icons.sell_outlined, phase: 'UI 10'),
-    (
-      path: '/cash/history',
-      title: 'Cierres de días pasados',
-      icon: Icons.calendar_month_outlined,
-      phase: 'UI 8',
-    ),
     (path: '/settings', title: 'Ajustes', icon: Icons.settings_outlined, phase: 'UI 10'),
   ])
     GoRoute(
@@ -189,6 +189,22 @@ GoRouter appRouter(Ref ref) {
       GoRoute(
         path: SupplySaleScreen.path,
         builder: (context, state) => const SupplySaleScreen(),
+      ),
+      // El cierre y su histórico también se apilan sobre el shell, y **antes**
+      // que él por lo mismo que la venta: son rutas bajo `/cash` y la rama de
+      // Caja gana la coincidencia si se declaran después.
+      //
+      // La fecha viaja como query y no en la ruta porque la pantalla tiene un
+      // día por omisión —hoy— y `/cash/close` a secas tiene que seguir
+      // significando "cerrar el día de hoy".
+      GoRoute(
+        path: DayCloseScreen.path,
+        builder: (context, state) =>
+            DayCloseScreen(date: state.uri.queryParameters['date']),
+      ),
+      GoRoute(
+        path: CloseHistoryScreen.path,
+        builder: (context, state) => const CloseHistoryScreen(),
       ),
       // Administrar promociones también se apila sobre el shell: se llega desde
       // "Más", es cosa de admin y no uno de los cinco destinos del mostrador.

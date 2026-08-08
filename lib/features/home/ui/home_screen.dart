@@ -4,8 +4,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/auth/app_permissions.dart';
+import '../../../core/money/fixed2.dart';
 import '../../auth/state/auth_controller.dart';
 import '../../auth/ui/widgets/permission_gate.dart';
+import '../../orders/models/order.dart';
 import '../../shell/ui/widgets/gradient_header.dart';
 import '../../sync/state/sync_status_controller.dart';
 import '../../sync/ui/widgets/sync_status_indicator.dart';
@@ -24,8 +26,7 @@ class HomeScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final summaryAsync = ref.watch(homeSummaryControllerProvider);
-    final summary = summaryAsync.valueOrNull ?? const HomeSummary.empty();
+    final summary = ref.watch(homeSummaryProvider);
     final syncStatus = ref.watch(syncStatusControllerProvider);
 
     return Column(
@@ -34,7 +35,11 @@ class HomeScreen extends ConsumerWidget {
         Expanded(
           child: RefreshIndicator(
             color: AppColors.primary500,
-            onRefresh: () => ref.read(homeSummaryControllerProvider.notifier).refresh(),
+            // Las cifras salen de la BD local y ya llegan en vivo: no hay nada
+            // que "recargar". Lo que el gesto pide de verdad es lo de afuera —
+            // subir lo capturado y bajar lo que hicieron las otras tabletas—,
+            // así que tira de un ciclo de sincronización.
+            onRefresh: () => ref.read(syncStatusControllerProvider.notifier).syncNow(),
             child: ListView(
               padding: const EdgeInsets.fromLTRB(
                 AppSpacing.md,
@@ -79,9 +84,11 @@ class HomeScreen extends ConsumerWidget {
                       WorkshopCard(
                         summary: summary,
                         onStatusTap: (status) =>
-                            context.go('/orders', extra: {'status': status}),
-                        onDeliveredTap: () =>
-                            context.go('/orders', extra: {'status': 'delivered'}),
+                            context.go('/orders', extra: {'status': status.wire}),
+                        onDeliveredTap: () => context.go(
+                          '/orders',
+                          extra: {'status': OrderStatus.delivered.wire},
+                        ),
                       ),
                       const SizedBox(height: 18),
                       _ReadyOrdersSection(orders: summary.readyOrders),
@@ -323,7 +330,7 @@ class _ReadyOrderCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.end,
         mainAxisSize: MainAxisSize.min,
         children: [
-          AppMoneyText(order.total, size: AppMoneySize.sm),
+          AppMoneyText(Fixed2.toDouble(order.total), size: AppMoneySize.sm),
           const SizedBox(height: 3),
           order.isPaid
               ? const AppStatusBadge(
@@ -333,7 +340,7 @@ class _ReadyOrderCard extends StatelessWidget {
                 )
               : AppStatusBadge(
                   label:
-                      'Saldo ${AppMoneyText.format(order.balance, showDecimals: false)}',
+                      'Saldo ${AppMoneyText.format(Fixed2.toDouble(order.balance), showDecimals: false)}',
                   tone: AppStatusTone.error,
                   size: AppStatusBadgeSize.sm,
                 ),

@@ -6,33 +6,57 @@ part of 'home_summary_controller.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$homeSummaryControllerHash() =>
-    r'3072ec1be79298114137c396d4cdd573958336de';
+String _$homeDateHash() => r'baba80fb29bb4bbc1c1f245552a8a8a342539a62';
 
-/// Resumen del día que consume la pantalla Inicio.
+/// El día del que habla Inicio: el de negocio, siempre hoy.
 ///
-/// La fuente real es `GET /daily-close/preview` más la BD local para los
-/// contadores de pedidos (Plan 0006 §4.1), y ninguna de las dos existe todavía:
-/// el backend solo tiene el módulo `identity` y la BD local llega con el Plan
-/// 0004. Hasta entonces se devuelve el día en cero, que es lo que la UI debe
-/// mostrar de todas formas al abrir la app antes del primer movimiento.
+/// Tiene provider propio para no leer `businessDate()` en tres sitios del
+/// resumen y que dos de ellos pudieran caer a lados distintos de la medianoche.
 ///
-/// Copied from [HomeSummaryController].
-@ProviderFor(HomeSummaryController)
-final homeSummaryControllerProvider =
-    AutoDisposeAsyncNotifierProvider<
-      HomeSummaryController,
-      HomeSummary
-    >.internal(
-      HomeSummaryController.new,
-      name: r'homeSummaryControllerProvider',
-      debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
-          ? null
-          : _$homeSummaryControllerHash,
-      dependencies: null,
-      allTransitiveDependencies: null,
-    );
+/// Copied from [homeDate].
+@ProviderFor(homeDate)
+final homeDateProvider = AutoDisposeProvider<String>.internal(
+  homeDate,
+  name: r'homeDateProvider',
+  debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
+      ? null
+      : _$homeDateHash,
+  dependencies: null,
+  allTransitiveDependencies: null,
+);
 
-typedef _$HomeSummaryController = AutoDisposeAsyncNotifier<HomeSummary>;
+@Deprecated('Will be removed in 3.0. Use Ref instead')
+// ignore: unused_element
+typedef HomeDateRef = AutoDisposeProviderRef<String>;
+String _$homeSummaryHash() => r'bd833e1159b0eb18d003c538afa4441f6f6af910';
+
+/// El resumen del día que consume la pantalla Inicio (Plan 0006 §4.1).
+///
+/// Se arma **contra la BD local** y no contra `GET /daily-close/preview`: el
+/// plan da esa ruta como fuente y el cálculo local como respaldo sin señal, pero
+/// aquí el respaldo es lo único que hace falta. Inicio se abre al llegar en la
+/// mañana, muchas veces antes de que el primer pull termine, y las cifras que
+/// pediría al servidor son exactamente las que la Caja ya suma de las mismas
+/// tablas espejo. Pedirlas de nuevo por red solo agregaría una pantalla que se
+/// queda en cero cuando no hay señal, que es justo lo que esto viene a arreglar.
+///
+/// La cifra oficial sigue siendo la del servidor y se ve donde importa: en el
+/// acta del cierre (§7.4), que sí es online-only.
+///
+/// Copied from [homeSummary].
+@ProviderFor(homeSummary)
+final homeSummaryProvider = AutoDisposeProvider<HomeSummary>.internal(
+  homeSummary,
+  name: r'homeSummaryProvider',
+  debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
+      ? null
+      : _$homeSummaryHash,
+  dependencies: null,
+  allTransitiveDependencies: null,
+);
+
+@Deprecated('Will be removed in 3.0. Use Ref instead')
+// ignore: unused_element
+typedef HomeSummaryRef = AutoDisposeProviderRef<HomeSummary>;
 // ignore_for_file: type=lint
 // ignore_for_file: subtype_of_sealed_class, invalid_use_of_internal_member, invalid_use_of_visible_for_testing_member, deprecated_member_use_from_same_package

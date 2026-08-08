@@ -15,6 +15,7 @@ import '../domain/cash_day.dart';
 import '../models/cash_entry.dart';
 import '../models/expense.dart';
 import '../state/cash_day_controller.dart';
+import 'day_close_screen.dart';
 import 'supply_sale_screen.dart';
 import 'widgets/expense_sheet.dart';
 
@@ -37,7 +38,7 @@ class _CashScreenState extends ConsumerState<CashScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final day = ref.watch(cashDayProvider);
+    final day = ref.watch(selectedCashDayProvider);
 
     return Stack(
       children: [
@@ -634,10 +635,11 @@ class _ExpensesTotal extends StatelessWidget {
   }
 }
 
-/// Las dos acciones del mostrador, fijas sobre la barra inferior.
+/// Las acciones del mostrador, fijas sobre la barra inferior.
 ///
-/// «Cerrar día» no está: su pantalla es la fase UI 8, y un botón que lleva a un
-/// marcador en medio del flujo del mostrador es peor que no tenerlo.
+/// «Cerrar día» va arriba y en una fila propia, no como tercer botón: las dos de
+/// abajo se tocan decenas de veces al día y esta una sola vez, al final, y
+/// ponerlas del mismo tamaño invitaría a cerrar el día con un pulgar distraído.
 class _CashFooter extends ConsumerWidget {
   const _CashFooter({required this.day});
 
@@ -645,40 +647,57 @@ class _CashFooter extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final date = ref.watch(cashDateFilterProvider);
+
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 10, 16, 14),
       decoration: const BoxDecoration(
         color: AppColors.background,
         border: Border(top: BorderSide(color: AppColors.border)),
       ),
-      child: Row(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Expanded(
-            child: PermissionGate(
-              anyOf: const [AppPermissions.expensesCreate],
-              child: AppButton(
-                label: 'Gasto',
-                icon: const Icon(Icons.remove_circle_outline_rounded),
-                variant: AppButtonVariant.outline,
-                fullWidth: true,
-                onPressed: day.isClosed ? null : () => _addExpense(context, ref),
+          PermissionGate(
+            anyOf: const [AppPermissions.dailyCloseRead],
+            child: Padding(
+              padding: const EdgeInsets.only(bottom: 9),
+              child: _CloseDayRow(
+                closed: day.isClosed,
+                onTap: () => context.push('${DayCloseScreen.path}?date=${isoDate(date)}'),
               ),
             ),
           ),
-          const SizedBox(width: 9),
-          Expanded(
-            child: PermissionGate(
-              anyOf: const [AppPermissions.supplySalesCreate],
-              child: AppButton(
-                label: 'Venta',
-                icon: const Icon(Icons.local_mall_outlined),
-                fullWidth: true,
-                elevated: true,
-                onPressed: day.isClosed
-                    ? null
-                    : () => context.push(SupplySaleScreen.path),
+          Row(
+            children: [
+              Expanded(
+                child: PermissionGate(
+                  anyOf: const [AppPermissions.expensesCreate],
+                  child: AppButton(
+                    label: 'Gasto',
+                    icon: const Icon(Icons.remove_circle_outline_rounded),
+                    variant: AppButtonVariant.outline,
+                    fullWidth: true,
+                    onPressed: day.isClosed ? null : () => _addExpense(context, ref),
+                  ),
+                ),
               ),
-            ),
+              const SizedBox(width: 9),
+              Expanded(
+                child: PermissionGate(
+                  anyOf: const [AppPermissions.supplySalesCreate],
+                  child: AppButton(
+                    label: 'Venta',
+                    icon: const Icon(Icons.local_mall_outlined),
+                    fullWidth: true,
+                    elevated: true,
+                    onPressed: day.isClosed
+                        ? null
+                        : () => context.push(SupplySaleScreen.path),
+                  ),
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -704,6 +723,54 @@ class _CashFooter extends ConsumerWidget {
     result.match(
       (failure) => _say(context, failure.message),
       (expense) => _say(context, 'Gasto de Q${Fixed2.format(expense.amount)} registrado'),
+    );
+  }
+}
+
+/// La entrada al acta del día (§7.4). Dice qué va a encontrar quien la toque:
+/// un día abierto lleva al cierre, uno cerrado al acta que ya se firmó.
+class _CloseDayRow extends StatelessWidget {
+  const _CloseDayRow({required this.closed, required this.onTap});
+
+  final bool closed;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: closed ? AppColors.gray100 : AppColors.primary50,
+      borderRadius: BorderRadius.circular(13),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(13),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 11),
+          child: Row(
+            children: [
+              Icon(
+                closed ? Icons.lock_outline_rounded : Icons.event_available_outlined,
+                size: 17,
+                color: closed ? AppColors.gray600 : AppColors.primary700,
+              ),
+              const SizedBox(width: 9),
+              Expanded(
+                child: Text(
+                  closed ? 'Ver el acta del día' : 'Cerrar día',
+                  style: AppTypography.button(
+                    fontSize: 13.5,
+                    color: closed ? AppColors.gray600 : AppColors.primary700,
+                  ),
+                ),
+              ),
+              Icon(
+                Icons.chevron_right_rounded,
+                size: 18,
+                color: closed ? AppColors.gray600 : AppColors.primary700,
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

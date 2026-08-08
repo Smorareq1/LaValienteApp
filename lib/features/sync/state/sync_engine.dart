@@ -68,7 +68,11 @@ class SyncEngine extends _$SyncEngine {
   Timer? _retry;
   Timer? _debounce;
   AppLifecycleListener? _lifecycle;
+  StreamSubscription<int>? _outbox;
   Future<void>? _inFlight;
+
+  /// Cuántas operaciones esperaban la última vez que se miró el outbox.
+  int? _pending;
 
   @override
   SyncEngineState build() {
@@ -84,6 +88,7 @@ class SyncEngine extends _$SyncEngine {
 
     _periodic = Timer.periodic(kSyncPeriodicInterval, (_) => unawaited(sync()));
     _lifecycle = AppLifecycleListener(onResume: () => unawaited(sync()));
+    _outbox = ref.read(syncRepositoryProvider).watchPendingCount().listen(_onOutboxChanged);
 
     // La suscripción muere con el provider, así que no hace falta guardarla.
     ref.listen(connectivityChangesProvider, (_, next) {
@@ -99,33 +104,39 @@ class SyncEngine extends _$SyncEngine {
     return _inFlight ??= _runCycle().whenComplete(() => _inFlight = null);
   }
 
-  /// Registra una captura local y programa su subida.
-  ///
-  /// Es la puerta por la que entra todo lo que la app escribe: la UI no habla
-  /// con el repositorio de sync, encola aquí y sigue trabajando.
-  Future<void> capture({
-    required String entity,
-    required String opType,
-    required String entityId,
-    required Map<String, dynamic> payload,
-    int? baseVersion,
-  }) async {
-    await ref
-        .read(syncRepositoryProvider)
-        .enqueue(
-          entity: entity,
-          opType: opType,
-          entityId: entityId,
-          payload: payload,
-          baseVersion: baseVersion,
-        );
-    syncSoon();
-  }
-
   /// Pide un ciclo tras una captura local, agrupando ráfagas de ediciones.
   void syncSoon() {
     _debounce?.cancel();
     _debounce = Timer(kSyncMutationDebounce, () => unawaited(sync()));
+  }
+
+  /// El outbox cambió de tamaño: si creció, alguien acaba de capturar algo.
+  ///
+  /// Este es el disparador de **mutación local** del §5, y se implementa
+  /// mirando la cola en vez de esperar que cada repositorio avise por dos
+  /// razones. La primera es de capas: las dependencias de un módulo apuntan
+  /// hacia adentro (UI → State → Data), así que un repositorio no puede llamar
+  /// al motor sin invertir esa flecha. La segunda es que mirar la cola no se
+  /// puede olvidar, y avisar sí: mientras el aviso fue responsabilidad de quien
+  /// capturaba, ningún repositorio lo dio nunca y toda captura esperó los dos
+  /// minutos del periódico para salir del mostrador.
+  ///
+  /// La cuenta la publica drift al **confirmar** la transacción, así que cuando
+  /// esto corre la fila espejo y su operación ya están las dos en disco.
+  void _onOutboxChanged(int pending) {
+    final before = _pending;
+    _pending = pending;
+
+    // Solo cuando crece. Que baje es el propio push sacando lo que ya subió, y
+    // la primera lectura es el arranque, que tiene su ciclo al final de `build`.
+    if (before == null || pending <= before) return;
+
+    // Si el motor viene de fallar manda el backoff. Seguir capturando durante
+    // un corte no es razón para volver a golpear al servidor cada dos segundos:
+    // el reintento ya está agendado y estas operaciones saldrán en él.
+    if (state.nextAttemptAt != null) return;
+
+    syncSoon();
   }
 
   Future<void> _runCycle() async {
@@ -171,9 +182,14 @@ class SyncEngine extends _$SyncEngine {
     _retry?.cancel();
     _debounce?.cancel();
     _lifecycle?.dispose();
+    unawaited(_outbox?.cancel());
     _periodic = null;
     _retry = null;
     _debounce = null;
     _lifecycle = null;
+    _outbox = null;
+    // Se olvida la cuenta: al volver a arrancar, la primera lectura del outbox
+    // vuelve a ser el arranque y no una captura.
+    _pending = null;
   }
 }

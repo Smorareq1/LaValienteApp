@@ -1,6 +1,7 @@
 import 'package:design_system/design_system.dart';
 import 'package:flutter/material.dart';
 
+import '../../../orders/models/order.dart';
 import '../../models/home_summary.dart';
 
 /// Tarjeta "En el taller": cuántos pedidos hay en cada estado. Tocar un
@@ -15,8 +16,11 @@ class WorkshopCard extends StatelessWidget {
 
   final HomeSummary summary;
 
-  /// Recibe el código de estado del pedido (`received`, `in_process`, `ready`).
-  final ValueChanged<String> onStatusTap;
+  /// Recibe el estado al que filtrar la lista. Viaja el enum y no su código en
+  /// texto: escribirlo a mano fue justo lo que dejó "En proceso" abriendo la
+  /// lista sin filtro, porque el estado del backend es `in_progress` y aquí
+  /// decía `in_process`.
+  final ValueChanged<OrderStatus> onStatusTap;
   final VoidCallback onDeliveredTap;
 
   @override
@@ -40,7 +44,7 @@ class WorkshopCard extends StatelessWidget {
                     label: 'Recibidos',
                     color: AppColors.secondary700,
                     highlight: AppColors.secondary50,
-                    onTap: () => onStatusTap('received'),
+                    onTap: () => onStatusTap(OrderStatus.received),
                   ),
                 ),
                 const _CountDivider(),
@@ -50,7 +54,7 @@ class WorkshopCard extends StatelessWidget {
                     label: 'En proceso',
                     color: AppColors.warningText,
                     highlight: AppColors.warningBg,
-                    onTap: () => onStatusTap('in_process'),
+                    onTap: () => onStatusTap(OrderStatus.inProgress),
                   ),
                 ),
                 const _CountDivider(),
@@ -60,7 +64,7 @@ class WorkshopCard extends StatelessWidget {
                     label: 'Listos',
                     color: AppColors.successText,
                     highlight: AppColors.successBg,
-                    onTap: () => onStatusTap('ready'),
+                    onTap: () => onStatusTap(OrderStatus.ready),
                   ),
                 ),
               ],

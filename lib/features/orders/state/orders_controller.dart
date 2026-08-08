@@ -36,11 +36,22 @@ class OrderSearchQuery extends _$OrderSearchQuery {
   void update(String query) => state = query;
 }
 
-/// Los pedidos del día elegido, tal como están en la BD local.
+/// Los pedidos de una fecha cualquiera, tal como están en la BD local.
+///
+/// Va por fecha y no por el filtro de la lista porque Inicio también los cuenta
+/// y siempre habla de hoy: si leyera el filtro, abrir el calendario en Pedidos
+/// le cambiaría los contadores a la pantalla principal.
 @riverpod
-Stream<List<OrderListItem>> ordersForDay(Ref ref) {
+Stream<List<OrderListItem>> ordersOn(Ref ref, String date) {
+  return ref.watch(ordersRepositoryProvider).watchByDate(date);
+}
+
+/// Los pedidos del día elegido en la lista, que es [ordersOn] con la fecha que
+/// el chip de la pantalla tenga puesta.
+@riverpod
+AsyncValue<List<OrderListItem>> ordersForDay(Ref ref) {
   final date = ref.watch(orderDateFilterProvider);
-  return ref.watch(ordersRepositoryProvider).watchByDate(isoDate(date));
+  return ref.watch(ordersOnProvider(isoDate(date)));
 }
 
 /// Los del día, ya pasados por los filtros de estado y búsqueda.

@@ -23,25 +23,22 @@ class CashDateFilter extends _$CashDateFilter {
   void update(DateTime date) => state = DateTime(date.year, date.month, date.day);
 }
 
-/// Los cobros de pedidos del día.
+/// Los cobros de pedidos de una fecha.
 @riverpod
-Stream<List<CashEntry>> cashOrderPayments(Ref ref) {
-  final date = ref.watch(cashDateFilterProvider);
-  return ref.watch(cashLocalDataSourceProvider).watchOrderPayments(isoDate(date));
+Stream<List<CashEntry>> cashOrderPayments(Ref ref, String date) {
+  return ref.watch(cashLocalDataSourceProvider).watchOrderPayments(date);
 }
 
-/// Las ventas de insumo del día.
+/// Las ventas de insumo de una fecha.
 @riverpod
-Stream<List<SupplySaleSummary>> cashSupplySales(Ref ref) {
-  final date = ref.watch(cashDateFilterProvider);
-  return ref.watch(inventoryRepositoryProvider).watchSalesByDate(isoDate(date));
+Stream<List<SupplySaleSummary>> cashSupplySales(Ref ref, String date) {
+  return ref.watch(inventoryRepositoryProvider).watchSalesByDate(date);
 }
 
-/// Los gastos del día.
+/// Los gastos de una fecha.
 @riverpod
-Stream<List<Expense>> cashExpenses(Ref ref) {
-  final date = ref.watch(cashDateFilterProvider);
-  return ref.watch(expensesRepositoryProvider).watchByDate(isoDate(date));
+Stream<List<Expense>> cashExpenses(Ref ref, String date) {
+  return ref.watch(expensesRepositoryProvider).watchByDate(date);
 }
 
 /// Las categorías que el formulario de gasto puede ofrecer.
@@ -56,9 +53,8 @@ Stream<List<ExpenseCategory>> cashExpensesCategories(Ref ref) {
 
 /// El acta, si la fecha ya se cerró.
 @riverpod
-Stream<DayClosure?> cashClosure(Ref ref) {
-  final date = ref.watch(cashDateFilterProvider);
-  return ref.watch(cashLocalDataSourceProvider).watchClosure(isoDate(date));
+Stream<DayClosure?> cashClosure(Ref ref, String date) {
+  return ref.watch(cashLocalDataSourceProvider).watchClosure(date);
 }
 
 /// El día entero, armado de sus cuatro fuentes.
@@ -66,13 +62,18 @@ Stream<DayClosure?> cashClosure(Ref ref) {
 /// Se compone aquí y no en una consulta porque son cuatro tablas que no se
 /// pueden unir con sentido: un cobro, una venta y un gasto no comparten ni
 /// columnas ni fecha de corte. Cada una llega en vivo y la suma se rehace sola.
+///
+/// Recibe la fecha en vez de leer el filtro de la pantalla: la Caja mira el día
+/// que alguien eligió con el calendario e Inicio mira siempre hoy. Atarlo al
+/// filtro haría que abrir el calendario en Caja cambiara las cifras de Inicio.
 @riverpod
-CashDay cashDay(Ref ref) {
-  final date = isoDate(ref.watch(cashDateFilterProvider));
-  final payments = ref.watch(cashOrderPaymentsProvider).valueOrNull ?? const <CashEntry>[];
-  final sales = ref.watch(cashSupplySalesProvider).valueOrNull ?? const <SupplySaleSummary>[];
-  final expenses = ref.watch(cashExpensesProvider).valueOrNull ?? const <Expense>[];
-  final closure = ref.watch(cashClosureProvider).valueOrNull;
+CashDay cashDay(Ref ref, String date) {
+  final payments =
+      ref.watch(cashOrderPaymentsProvider(date)).valueOrNull ?? const <CashEntry>[];
+  final sales =
+      ref.watch(cashSupplySalesProvider(date)).valueOrNull ?? const <SupplySaleSummary>[];
+  final expenses = ref.watch(cashExpensesProvider(date)).valueOrNull ?? const <Expense>[];
+  final closure = ref.watch(cashClosureProvider(date)).valueOrNull;
 
   final incomes = <CashEntry>[
     ...payments,
@@ -111,11 +112,13 @@ int _byTimeDescending(CashEntry a, CashEntry b) {
   return right.compareTo(left);
 }
 
-/// Si la fecha que se está mirando admite escrituras.
+/// El día que la pantalla de Caja está mirando: [cashDay] con la fecha del chip.
 ///
-/// Es el candado del §14: un día cerrado se lee, no se escribe. La comprobación
-/// de verdad la hace el servidor —el candado vive en sus services (plan 0005
-/// D9)— y esto es para no ofrecer un botón que va a terminar en la cola de
-/// revisión con el papel ya firmado.
+/// De aquí sale el candado del §14 —un día cerrado se lee, no se escribe—. La
+/// comprobación de verdad la hace el servidor, porque el candado vive en sus
+/// services (plan 0005 D9); esto es para no ofrecer un botón que va a terminar
+/// en la cola de revisión con el papel ya firmado.
 @riverpod
-bool cashDayIsLocked(Ref ref) => ref.watch(cashDayProvider).isClosed;
+CashDay selectedCashDay(Ref ref) {
+  return ref.watch(cashDayProvider(isoDate(ref.watch(cashDateFilterProvider))));
+}

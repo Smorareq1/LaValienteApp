@@ -132,7 +132,10 @@ class ReviewQueueController extends _$ReviewQueueController {
     }
     await ref.read(syncRepositoryProvider).retryReview(item, baseVersion: baseVersion);
     // Quien acaba de decidir espera que salga ahora, no en el siguiente ciclo
-    // periódico: reintentar es una acción, no una captura de mostrador.
+    // periódico: reintentar es una acción, no una captura de mostrador. Por eso
+    // se pide a mano y no se deja al disparador del outbox, que se aparta
+    // mientras el motor está en backoff —y una operación que llega a esta cola
+    // viene justamente de un fallo—.
     ref.read(syncEngineProvider.notifier).syncSoon();
   }
 }

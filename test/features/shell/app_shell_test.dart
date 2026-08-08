@@ -202,15 +202,9 @@ void main() {
     await tester.tap(find.text('Más'));
     await tester.pumpAndSettle();
 
-    // Sincronización y Promociones quedan fuera: son las del hub que ya tienen
-    // pantalla real (UI 1 y UI 5).
-    const entries = [
-      'Insumos',
-      'Personal',
-      'Catálogo',
-      'Cierres de días pasados',
-      'Ajustes',
-    ];
+    // Quedan fuera las del hub que ya tienen pantalla real: Sincronización
+    // (UI 1), Promociones (UI 5) y los cierres (UI 8).
+    const entries = ['Insumos', 'Personal', 'Catálogo', 'Ajustes'];
 
     for (final entry in entries) {
       await tester.tap(find.text(entry));
