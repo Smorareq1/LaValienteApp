@@ -89,6 +89,164 @@ class InventoryLocalDataSource {
     ];
   }
 
+  /// El inventario, no el mostrador (§8.1).
+  ///
+  /// A diferencia de [watchShelf], aquí entra **todo** el stock: los lotes de
+  /// consumo interno, que no tienen precio y el FIFO de venta salta, son
+  /// suavizante que la lavandería sí tiene. Y no se descuenta lo capturado sin
+  /// señal: esta pantalla dice qué hay registrado, no qué se puede vender ahora.
+  Stream<List<ProductSummary>> watchProducts({bool includeArchived = false}) {
+    return _database
+        .customSelect(
+          'SELECT 1',
+          readsFrom: {_database.productEntries, _database.productLotEntries},
+        )
+        .watch()
+        .asyncMap((_) => products(includeArchived: includeArchived));
+  }
+
+  Future<List<ProductSummary>> products({bool includeArchived = false}) async {
+    final rows =
+        await (_database.select(_database.productEntries)
+              ..where(
+                (row) => includeArchived
+                    ? row.deletedAt.isNull()
+                    : row.deletedAt.isNull() & row.isActive.equals(true),
+              )
+              ..orderBy([
+                (row) => OrderingTerm.asc(row.sortOrder),
+                (row) => OrderingTerm.asc(row.name),
+              ]))
+            .get();
+
+    final lots = await _liveLots();
+    return [for (final row in rows) _toSummary(row, lots[row.id] ?? const [])];
+  }
+
+  /// Un producto con sus lotes y su kardex (§8.2).
+  Stream<ProductDetail?> watchDetail(String productId) {
+    return _database
+        .customSelect(
+          'SELECT 1',
+          readsFrom: {
+            _database.productEntries,
+            _database.productLotEntries,
+            _database.inventoryMovementEntries,
+          },
+        )
+        .watch()
+        .asyncMap((_) => detail(productId));
+  }
+
+  Future<ProductDetail?> detail(String productId) async {
+    final row =
+        await (_database.select(_database.productEntries)
+              ..where((product) => product.id.equals(productId))
+              ..limit(1))
+            .getSingleOrNull();
+    if (row == null || row.deletedAt != null) return null;
+
+    final lots = (await _liveLots())[productId] ?? const <ProductLot>[];
+    final movements = await _movementsFor(lots.map((lot) => lot.id).toList());
+
+    return ProductDetail(
+      product: _toSummary(row, lots),
+      lots: lots,
+      movements: movements,
+    );
+  }
+
+  /// Los lotes vivos agrupados por producto, en orden de llegada (el del FIFO).
+  Future<Map<String, List<ProductLot>>> _liveLots() async {
+    final rows =
+        await (_database.select(_database.productLotEntries)
+              ..where((row) => row.deletedAt.isNull())
+              ..orderBy([
+                (row) => OrderingTerm.asc(row.receivedAt),
+                (row) => OrderingTerm.asc(row.lotNumber),
+              ]))
+            .get();
+
+    final byProduct = <String, List<ProductLot>>{};
+    for (final row in rows) {
+      byProduct
+          .putIfAbsent(row.productId, () => [])
+          .add(
+            ProductLot(
+              id: row.id,
+              lotNumber: row.lotNumber,
+              quantityReceived: Fixed2.parse(row.quantityReceived) ?? 0,
+              quantityAvailable: Fixed2.parse(row.quantityAvailable) ?? 0,
+              receivedAt: row.receivedAt,
+              salePrice: Fixed2.parse(row.salePrice),
+              version: row.version,
+            ),
+          );
+    }
+    return byProduct;
+  }
+
+  /// El kardex de unos lotes, de lo más reciente a lo más viejo.
+  ///
+  /// Vacío si el producto no tiene lotes: sin `IN ()` que armar, la consulta se
+  /// ahorra y devuelve lo mismo.
+  Future<List<InventoryMovement>> _movementsFor(List<String> lotIds) async {
+    if (lotIds.isEmpty) return const [];
+
+    final movements = _database.inventoryMovementEntries;
+    final lots = _database.productLotEntries;
+
+    final rows =
+        await (_database.select(movements).join([
+              innerJoin(lots, lots.id.equalsExp(movements.lotId)),
+            ])
+              ..where(movements.deletedAt.isNull() & movements.lotId.isIn(lotIds))
+              ..orderBy([OrderingTerm.desc(movements.createdAt)]))
+            .get();
+
+    return [
+      for (final row in rows)
+        InventoryMovement(
+          id: row.readTable(movements).id,
+          lotId: row.readTable(movements).lotId,
+          lotNumber: row.readTable(lots).lotNumber,
+          type: MovementType.fromWire(row.readTable(movements).movementType),
+          quantity: Fixed2.parse(row.readTable(movements).quantity) ?? 0,
+          unitPrice: Fixed2.parse(row.readTable(movements).unitPrice),
+          notes: row.readTable(movements).notes,
+          createdAt: row.readTable(movements).createdAt,
+        ),
+    ];
+  }
+
+  static ProductSummary _toSummary(ProductEntry row, List<ProductLot> lots) {
+    var stock = 0;
+    var sellable = 0;
+    int? nextPrice;
+    for (final lot in lots) {
+      if (lot.quantityAvailable <= 0) continue;
+      stock += lot.quantityAvailable;
+      if (lot.salePrice == null) continue;
+      sellable += lot.quantityAvailable;
+      // Los lotes vienen en orden de llegada, así que el primero vendible con
+      // existencias es el que saldría (D5).
+      nextPrice ??= lot.salePrice;
+    }
+
+    return ProductSummary(
+      id: row.id,
+      name: row.name,
+      unit: row.unit,
+      isActive: row.isActive,
+      stock: stock,
+      sellableStock: sellable,
+      version: row.version,
+      imagePath: row.imagePath,
+      description: row.description,
+      nextSalePrice: nextPrice,
+    );
+  }
+
   /// Lo que las ventas todavía sin confirmar ya se llevaron, por producto.
   ///
   /// La fila del lote sigue diciendo lo que el servidor sabía, porque el pull no

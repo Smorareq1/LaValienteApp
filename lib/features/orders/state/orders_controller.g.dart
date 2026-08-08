@@ -31,9 +31,9 @@ class _SystemHash {
 
 /// Los pedidos de una fecha cualquiera, tal como están en la BD local.
 ///
-/// Va por fecha y no por el filtro de la lista porque hay dos pantallas más que
-/// preguntan por un día que nadie eligió: Inicio siempre habla de hoy, y el
-/// cierre del día habla de la fecha que se está cerrando.
+/// Va por fecha y no por el filtro de la lista porque Inicio también los cuenta
+/// y siempre habla de hoy: si leyera el filtro, abrir el calendario en Pedidos
+/// le cambiaría los contadores a la pantalla principal.
 ///
 /// Copied from [ordersOn].
 @ProviderFor(ordersOn)
@@ -41,26 +41,26 @@ const ordersOnProvider = OrdersOnFamily();
 
 /// Los pedidos de una fecha cualquiera, tal como están en la BD local.
 ///
-/// Va por fecha y no por el filtro de la lista porque hay dos pantallas más que
-/// preguntan por un día que nadie eligió: Inicio siempre habla de hoy, y el
-/// cierre del día habla de la fecha que se está cerrando.
+/// Va por fecha y no por el filtro de la lista porque Inicio también los cuenta
+/// y siempre habla de hoy: si leyera el filtro, abrir el calendario en Pedidos
+/// le cambiaría los contadores a la pantalla principal.
 ///
 /// Copied from [ordersOn].
 class OrdersOnFamily extends Family<AsyncValue<List<OrderListItem>>> {
   /// Los pedidos de una fecha cualquiera, tal como están en la BD local.
   ///
-  /// Va por fecha y no por el filtro de la lista porque hay dos pantallas más que
-  /// preguntan por un día que nadie eligió: Inicio siempre habla de hoy, y el
-  /// cierre del día habla de la fecha que se está cerrando.
+  /// Va por fecha y no por el filtro de la lista porque Inicio también los cuenta
+  /// y siempre habla de hoy: si leyera el filtro, abrir el calendario en Pedidos
+  /// le cambiaría los contadores a la pantalla principal.
   ///
   /// Copied from [ordersOn].
   const OrdersOnFamily();
 
   /// Los pedidos de una fecha cualquiera, tal como están en la BD local.
   ///
-  /// Va por fecha y no por el filtro de la lista porque hay dos pantallas más que
-  /// preguntan por un día que nadie eligió: Inicio siempre habla de hoy, y el
-  /// cierre del día habla de la fecha que se está cerrando.
+  /// Va por fecha y no por el filtro de la lista porque Inicio también los cuenta
+  /// y siempre habla de hoy: si leyera el filtro, abrir el calendario en Pedidos
+  /// le cambiaría los contadores a la pantalla principal.
   ///
   /// Copied from [ordersOn].
   OrdersOnProvider call(String date) {
@@ -89,17 +89,17 @@ class OrdersOnFamily extends Family<AsyncValue<List<OrderListItem>>> {
 
 /// Los pedidos de una fecha cualquiera, tal como están en la BD local.
 ///
-/// Va por fecha y no por el filtro de la lista porque hay dos pantallas más que
-/// preguntan por un día que nadie eligió: Inicio siempre habla de hoy, y el
-/// cierre del día habla de la fecha que se está cerrando.
+/// Va por fecha y no por el filtro de la lista porque Inicio también los cuenta
+/// y siempre habla de hoy: si leyera el filtro, abrir el calendario en Pedidos
+/// le cambiaría los contadores a la pantalla principal.
 ///
 /// Copied from [ordersOn].
 class OrdersOnProvider extends AutoDisposeStreamProvider<List<OrderListItem>> {
   /// Los pedidos de una fecha cualquiera, tal como están en la BD local.
   ///
-  /// Va por fecha y no por el filtro de la lista porque hay dos pantallas más que
-  /// preguntan por un día que nadie eligió: Inicio siempre habla de hoy, y el
-  /// cierre del día habla de la fecha que se está cerrando.
+  /// Va por fecha y no por el filtro de la lista porque Inicio también los cuenta
+  /// y siempre habla de hoy: si leyera el filtro, abrir el calendario en Pedidos
+  /// le cambiaría los contadores a la pantalla principal.
   ///
   /// Copied from [ordersOn].
   OrdersOnProvider(String date)

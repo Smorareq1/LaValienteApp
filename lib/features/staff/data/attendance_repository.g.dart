@@ -1,33 +1,28 @@
 // GENERATED CODE - DO NOT MODIFY BY HAND
 
-part of 'app_router.dart';
+part of 'attendance_repository.dart';
 
 // **************************************************************************
 // RiverpodGenerator
 // **************************************************************************
 
-String _$appRouterHash() => r'c755d5a0461b06de30f0d89eab6f9f9209a898df';
+String _$attendanceRepositoryHash() =>
+    r'808571792249da4d2f5da411ee920785c99e958b';
 
-/// Router de la app con auth guard reactivo:
-/// - Mientras se restaura la sesión → splash.
-/// - Sin sesión → cualquier ruta protegida redirige a login.
-/// - Con sesión → login/splash redirigen a Inicio.
-/// - Con sesión pero sin el permiso de la ruta → vuelve a Inicio.
-///
-/// Copied from [appRouter].
-@ProviderFor(appRouter)
-final appRouterProvider = Provider<GoRouter>.internal(
-  appRouter,
-  name: r'appRouterProvider',
+/// See also [attendanceRepository].
+@ProviderFor(attendanceRepository)
+final attendanceRepositoryProvider = Provider<AttendanceRepository>.internal(
+  attendanceRepository,
+  name: r'attendanceRepositoryProvider',
   debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
       ? null
-      : _$appRouterHash,
+      : _$attendanceRepositoryHash,
   dependencies: null,
   allTransitiveDependencies: null,
 );
 
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
-typedef AppRouterRef = ProviderRef<GoRouter>;
+typedef AttendanceRepositoryRef = ProviderRef<AttendanceRepository>;
 // ignore_for_file: type=lint
 // ignore_for_file: subtype_of_sealed_class, invalid_use_of_internal_member, invalid_use_of_visible_for_testing_member, deprecated_member_use_from_same_package

@@ -15,6 +15,8 @@ import '../../features/cash/ui/day_close_screen.dart';
 import '../../features/cash/ui/supply_sale_screen.dart';
 import '../../features/customers/ui/customer_detail_screen.dart';
 import '../../features/customers/ui/customers_screen.dart';
+import '../../features/inventory/ui/inventory_screen.dart';
+import '../../features/inventory/ui/product_detail_screen.dart';
 import '../../features/home/ui/home_screen.dart';
 import '../../features/more/ui/more_screen.dart';
 import '../../features/orders/models/order.dart';
@@ -24,6 +26,7 @@ import '../../features/orders/ui/order_deliver_screen.dart';
 import '../../features/orders/ui/orders_screen.dart';
 import '../../features/promotions/ui/promotions_screen.dart';
 import '../../features/shell/ui/app_shell.dart';
+import '../../features/staff/ui/attendance_screen.dart';
 import '../../features/shell/ui/module_placeholder_screen.dart';
 import '../../features/sync/ui/review_detail_screen.dart';
 import '../../features/sync/ui/review_queue_screen.dart';
@@ -55,6 +58,8 @@ const Map<String, List<String>> _routePermissions = {
   CloseHistoryScreen.path: [AppPermissions.dailyCloseRead],
   '/inventory': [AppPermissions.inventoryRead],
   '/staff': [AppPermissions.attendanceRecord, AppPermissions.staffRead],
+  '/staff/employees': [AppPermissions.staffRead],
+  '/staff/settings': [AppPermissions.staffManage],
   '/catalog': [AppPermissions.catalogManage],
   '/promotions': [AppPermissions.promotionsManage],
 };
@@ -64,8 +69,6 @@ const Map<String, List<String>> _routePermissions = {
 /// así que el marcador solo lo ve quien tendría acceso a la pantalla real.
 final List<RouteBase> _pendingModules = [
   for (final module in const [
-    (path: '/inventory', title: 'Insumos', icon: Icons.inventory_2_outlined, phase: 'UI 7'),
-    (path: '/staff', title: 'Personal', icon: Icons.badge_outlined, phase: 'UI 7'),
     (path: '/catalog', title: 'Catálogo', icon: Icons.sell_outlined, phase: 'UI 10'),
     (path: '/settings', title: 'Ajustes', icon: Icons.settings_outlined, phase: 'UI 10'),
   ])
@@ -186,6 +189,23 @@ GoRouter appRouter(Ref ref) {
       // pedido: su footer con el TOTAL ocupa el sitio de la barra de cinco
       // destinos. Y **antes** del shell, porque dentro de la rama de Caja
       // podrían vivir rutas hijas que también casarían con "supply-sale".
+      GoRoute(
+        path: InventoryScreen.path,
+        builder: (context, state) => const InventoryScreen(),
+        routes: [
+          // Hija: el detalle se apila sobre la cuadrícula, así que volver
+          // regresa a ella con la búsqueda intacta.
+          GoRoute(
+            path: ':id',
+            builder: (context, state) =>
+                ProductDetailScreen(productId: state.pathParameters['id']!),
+          ),
+        ],
+      ),
+      GoRoute(
+        path: AttendanceScreen.path,
+        builder: (context, state) => const AttendanceScreen(),
+      ),
       GoRoute(
         path: SupplySaleScreen.path,
         builder: (context, state) => const SupplySaleScreen(),

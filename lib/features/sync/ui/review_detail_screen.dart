@@ -258,6 +258,17 @@ class _Explanation extends StatelessWidget {
       ReviewKind.supplySaleCreate =>
         'La venta no quedó registrada. Suele ser que el inventario de este '
             'teléfono estaba desactualizado y el producto ya no alcanzaba.',
+      // Una jornada rechazada casi siempre es la misma persona marcada dos
+      // veces: el servidor no deja abrir dos días de trabajo para alguien en la
+      // misma fecha.
+      ReviewKind.attendanceCreate =>
+        'La entrada no quedó registrada. Fijate si esta persona ya tenía la '
+            'jornada marcada desde otro teléfono.',
+      ReviewKind.attendanceUpdate when item.outcome == ReviewOutcome.conflict =>
+        'Alguien más cerró esta jornada mientras este teléfono estaba sin señal. '
+            'Tu cambio no se aplicó.',
+      ReviewKind.attendanceUpdate =>
+        'El servidor no aceptó el cambio. La jornada sigue como estaba.',
       ReviewKind.unknown =>
         'Esta operación no se pudo aplicar y necesita una decisión.',
     };

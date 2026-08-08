@@ -23,6 +23,8 @@ class ExpenseDraft {
     this.method = PaymentMethod.cash,
     this.status = ExpenseStatus.paid,
     this.observations,
+    this.employeeId,
+    this.attendanceRecordId,
   });
 
   /// `YYYY-MM-DD`.
@@ -37,6 +39,17 @@ class ExpenseDraft {
   final PaymentMethod method;
   final ExpenseStatus status;
   final String? observations;
+
+  /// A quién se le paga (§6.2). Va solo en el alta: el servidor no deja mover un
+  /// gasto de una persona a otra, porque eso no es una corrección sino otro pago.
+  final String? employeeId;
+
+  /// La jornada que se está pagando. El servidor exige que venga con su
+  /// empleado: un pago a nadie en particular es justo la fila que aparece sin
+  /// explicación a fin de mes.
+  final String? attendanceRecordId;
+
+  bool get isOvertimePayment => attendanceRecordId != null;
 }
 
 /// Gastos, contra la BD local siempre (plan 0004 D1).
@@ -94,12 +107,19 @@ class ExpensesRepository {
           status: draft.status,
           createdById: createdById,
           observations: observations,
+          employeeId: draft.employeeId,
+          attendanceRecordId: draft.attendanceRecordId,
         );
         await _sync.enqueue(
           entity: 'expense',
           opType: 'create',
           entityId: id,
-          payload: _payload(draft, concept: concept, observations: observations),
+          payload: _payload(
+            draft,
+            concept: concept,
+            observations: observations,
+            withLinks: true,
+          ),
         );
       });
     } catch (error) {
@@ -185,10 +205,15 @@ class ExpensesRepository {
   /// El cuerpo de `expense/create` y `expense/update`, con los nombres del
   /// backend. `method` se llama así y no `payment_method`, para leerse igual que
   /// el de un pago de pedido.
+  ///
+  /// Los vínculos viajan **solo en el alta** ([withLinks]): el `ExpenseUpdate`
+  /// del servidor no los admite, y mandarlos en una corrección sería pedir algo
+  /// que va a rebotar.
   static Map<String, dynamic> _payload(
     ExpenseDraft draft, {
     required String concept,
     String? observations,
+    bool withLinks = false,
   }) {
     return <String, dynamic>{
       'expense_date': draft.expenseDate,
@@ -198,6 +223,12 @@ class ExpensesRepository {
       'method': draft.method.wire,
       'status': draft.status.wire,
       'observations': observations,
+      if (withLinks) ...{
+        'employee_id': draft.employeeId,
+        // El servidor exige que una jornada venga con su empleado, así que la
+        // pantalla no deja elegirla sin él y aquí viajan juntos o no viajan.
+        'attendance_record_id': draft.attendanceRecordId,
+      },
     };
   }
 

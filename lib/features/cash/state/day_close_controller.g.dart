@@ -30,7 +30,7 @@ final closeHistoryProvider =
 // ignore: unused_element
 typedef CloseHistoryRef = AutoDisposeFutureProviderRef<List<DayClosureRecord>>;
 String _$dayCloseControllerHash() =>
-    r'ab3ef92de7c591e6b789e71671a1a9072106a17d';
+    r'6839e36ba10e763ac7ec4492b036a2ea64d5b3de';
 
 /// Copied from Dart SDK
 class _SystemHash {

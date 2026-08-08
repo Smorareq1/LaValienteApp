@@ -11,6 +11,7 @@ import 'tables/expense_tables.dart';
 import 'tables/inventory_tables.dart';
 import 'tables/order_tables.dart';
 import 'tables/promotion_tables.dart';
+import 'tables/staff_tables.dart';
 // El código generado inlinea el default de `syncStatus`, que sale de este enum:
 // sin el import, `app_database.g.dart` no compila.
 import 'tables/synced_columns.dart';
@@ -53,13 +54,20 @@ part 'app_database.g.dart';
     SupplySaleEntries,
     SupplySaleItemEntries,
     DailyClosureEntries,
+    // Espejo de personal y del kardex (PR 7–8), lo que UI 7 necesita para leerse
+    // sin señal.
+    EmployeeEntries,
+    WorkShiftEntries,
+    PayrollRateEntries,
+    AttendanceRecordEntries,
+    InventoryMovementEntries,
   ],
 )
 class AppDatabase extends _$AppDatabase {
   AppDatabase(super.executor);
 
   @override
-  int get schemaVersion => 7;
+  int get schemaVersion => 8;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -114,6 +122,19 @@ class AppDatabase extends _$AppDatabase {
           supplySaleEntries,
           supplySaleItemEntries,
           dailyClosureEntries,
+        ]);
+      }
+
+      // Espejo de personal y del kardex (PR 7–8): la asistencia del día, los
+      // turnos y la tarifa contra los que se mide una hora extra, y los
+      // movimientos que explican de dónde salió el stock de un lote.
+      if (from < 8) {
+        await _createAll(migrator, [
+          employeeEntries,
+          workShiftEntries,
+          payrollRateEntries,
+          attendanceRecordEntries,
+          inventoryMovementEntries,
         ]);
       }
 

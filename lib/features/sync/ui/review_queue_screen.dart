@@ -174,6 +174,8 @@ IconData reviewIcon(ReviewKind kind) => switch (kind) {
   ReviewKind.customerArchive => Icons.person_rounded,
   ReviewKind.expenseCreate || ReviewKind.expenseUpdate => Icons.receipt_rounded,
   ReviewKind.supplySaleCreate => Icons.local_mall_rounded,
+  ReviewKind.attendanceCreate ||
+  ReviewKind.attendanceUpdate => Icons.schedule_rounded,
   ReviewKind.unknown => Icons.help_outline_rounded,
 };
 

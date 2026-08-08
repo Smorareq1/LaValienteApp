@@ -7,14 +7,15 @@ import '../../sync/models/sync_change.dart';
 
 /// Espejos de insumos.
 ///
-/// Productos y lotes bajan y nunca suben (se administran en línea, D11); la
-/// venta de mostrador sube, porque ocurre con un cliente enfrente y no puede
-/// esperar señal.
+/// Productos, lotes y movimientos bajan y nunca suben (se administran en línea,
+/// D11); la venta de mostrador sube, porque ocurre con un cliente enfrente y no
+/// puede esperar señal.
 List<TableMirror<DataClass>> inventoryMirrors(AppDatabase database) => [
   ProductMirror(database),
   ProductLotMirror(database),
   SupplySaleMirror(database),
   SupplySaleItemMirror(database),
+  InventoryMovementMirror(database),
 ];
 
 DateTime? _instant(Object? value) =>
@@ -171,6 +172,31 @@ class SupplySaleItemMirror extends TableMirror<SupplySaleItemEntry> {
       quantity: Value(data['quantity'] as String),
       unitPrice: Value(data['unit_price'] as String),
       amount: Value(data['amount'] as String),
+    );
+  }
+}
+
+class InventoryMovementMirror extends TableMirror<InventoryMovementEntry> {
+  const InventoryMovementMirror(super.database);
+
+  @override
+  String get entity => 'inventory_movement';
+
+  @override
+  TableInfo<Table, InventoryMovementEntry> get table => database.inventoryMovementEntries;
+
+  @override
+  InventoryMovementEntriesCompanion toCompanion(SyncChange change) {
+    final data = change.data;
+    return InventoryMovementEntriesCompanion(
+      lotId: Value(data['lot_id'] as String),
+      movementType: Value(data['movement_type'] as String),
+      quantity: Value(data['quantity'] as String),
+      unitPrice: Value(data['unit_price'] as String?),
+      supplySaleItemId: Value(data['supply_sale_item_id'] as String?),
+      notes: Value(data['notes'] as String?),
+      createdById: Value(data['created_by_id'] as String),
+      createdAt: Value(_instant(data['created_at'])),
     );
   }
 }

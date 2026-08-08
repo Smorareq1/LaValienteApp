@@ -594,9 +594,8 @@ String _$cashDayHash() => r'c4d386554aa231df35881329eabd3a1c1df31fda';
 /// columnas ni fecha de corte. Cada una llega en vivo y la suma se rehace sola.
 ///
 /// Recibe la fecha en vez de leer el filtro de la pantalla: la Caja mira el día
-/// que alguien eligió con el calendario, Inicio siempre mira hoy y el cierre
-/// mira la fecha que se está cerrando. Atarlo al filtro haría que abrir el
-/// calendario en Caja cambiara las cifras de Inicio.
+/// que alguien eligió con el calendario e Inicio mira siempre hoy. Atarlo al
+/// filtro haría que abrir el calendario en Caja cambiara las cifras de Inicio.
 ///
 /// Copied from [cashDay].
 @ProviderFor(cashDay)
@@ -609,9 +608,8 @@ const cashDayProvider = CashDayFamily();
 /// columnas ni fecha de corte. Cada una llega en vivo y la suma se rehace sola.
 ///
 /// Recibe la fecha en vez de leer el filtro de la pantalla: la Caja mira el día
-/// que alguien eligió con el calendario, Inicio siempre mira hoy y el cierre
-/// mira la fecha que se está cerrando. Atarlo al filtro haría que abrir el
-/// calendario en Caja cambiara las cifras de Inicio.
+/// que alguien eligió con el calendario e Inicio mira siempre hoy. Atarlo al
+/// filtro haría que abrir el calendario en Caja cambiara las cifras de Inicio.
 ///
 /// Copied from [cashDay].
 class CashDayFamily extends Family<CashDay> {
@@ -622,9 +620,8 @@ class CashDayFamily extends Family<CashDay> {
   /// columnas ni fecha de corte. Cada una llega en vivo y la suma se rehace sola.
   ///
   /// Recibe la fecha en vez de leer el filtro de la pantalla: la Caja mira el día
-  /// que alguien eligió con el calendario, Inicio siempre mira hoy y el cierre
-  /// mira la fecha que se está cerrando. Atarlo al filtro haría que abrir el
-  /// calendario en Caja cambiara las cifras de Inicio.
+  /// que alguien eligió con el calendario e Inicio mira siempre hoy. Atarlo al
+  /// filtro haría que abrir el calendario en Caja cambiara las cifras de Inicio.
   ///
   /// Copied from [cashDay].
   const CashDayFamily();
@@ -636,9 +633,8 @@ class CashDayFamily extends Family<CashDay> {
   /// columnas ni fecha de corte. Cada una llega en vivo y la suma se rehace sola.
   ///
   /// Recibe la fecha en vez de leer el filtro de la pantalla: la Caja mira el día
-  /// que alguien eligió con el calendario, Inicio siempre mira hoy y el cierre
-  /// mira la fecha que se está cerrando. Atarlo al filtro haría que abrir el
-  /// calendario en Caja cambiara las cifras de Inicio.
+  /// que alguien eligió con el calendario e Inicio mira siempre hoy. Atarlo al
+  /// filtro haría que abrir el calendario en Caja cambiara las cifras de Inicio.
   ///
   /// Copied from [cashDay].
   CashDayProvider call(String date) {
@@ -672,9 +668,8 @@ class CashDayFamily extends Family<CashDay> {
 /// columnas ni fecha de corte. Cada una llega en vivo y la suma se rehace sola.
 ///
 /// Recibe la fecha en vez de leer el filtro de la pantalla: la Caja mira el día
-/// que alguien eligió con el calendario, Inicio siempre mira hoy y el cierre
-/// mira la fecha que se está cerrando. Atarlo al filtro haría que abrir el
-/// calendario en Caja cambiara las cifras de Inicio.
+/// que alguien eligió con el calendario e Inicio mira siempre hoy. Atarlo al
+/// filtro haría que abrir el calendario en Caja cambiara las cifras de Inicio.
 ///
 /// Copied from [cashDay].
 class CashDayProvider extends AutoDisposeProvider<CashDay> {
@@ -685,9 +680,8 @@ class CashDayProvider extends AutoDisposeProvider<CashDay> {
   /// columnas ni fecha de corte. Cada una llega en vivo y la suma se rehace sola.
   ///
   /// Recibe la fecha en vez de leer el filtro de la pantalla: la Caja mira el día
-  /// que alguien eligió con el calendario, Inicio siempre mira hoy y el cierre
-  /// mira la fecha que se está cerrando. Atarlo al filtro haría que abrir el
-  /// calendario en Caja cambiara las cifras de Inicio.
+  /// que alguien eligió con el calendario e Inicio mira siempre hoy. Atarlo al
+  /// filtro haría que abrir el calendario en Caja cambiara las cifras de Inicio.
   ///
   /// Copied from [cashDay].
   CashDayProvider(String date)

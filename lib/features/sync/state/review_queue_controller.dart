@@ -6,6 +6,7 @@ import '../../cash/data/expenses_repository.dart';
 import '../../customers/data/customers_repository.dart';
 import '../../orders/data/orders_repository.dart';
 import '../../orders/models/order.dart';
+import '../../staff/data/attendance_repository.dart';
 import '../data/sync_repository.dart';
 import '../models/review_item.dart';
 import '../models/review_subject.dart';
@@ -129,6 +130,10 @@ class ReviewQueueController extends _$ReviewQueueController {
     if (item.kind == ReviewKind.expenseUpdate) {
       final expense = await ref.read(expensesRepositoryProvider).byId(item.entityId);
       baseVersion = expense?.version;
+    }
+    if (item.kind == ReviewKind.attendanceUpdate) {
+      final record = await ref.read(attendanceRepositoryProvider).byId(item.entityId);
+      baseVersion = record?.version;
     }
     await ref.read(syncRepositoryProvider).retryReview(item, baseVersion: baseVersion);
     // Quien acaba de decidir espera que salga ahora, no en el siguiente ciclo
