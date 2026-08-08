@@ -1,9 +1,11 @@
 import 'package:design_system/design_system.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../core/auth/app_permissions.dart';
 import '../../../core/time/relative_time.dart';
+import '../../access/ui/users_screen.dart';
 import '../../auth/data/auth_repository.dart';
 import '../../auth/models/auth_user.dart';
 import '../../auth/state/auth_controller.dart';
@@ -13,11 +15,13 @@ import '../../sync/state/devices_controller.dart';
 
 /// Ajustes (Plan 0006 §12).
 ///
-/// Tres cosas: quién eres, con qué aparatos entra la lavandería y cómo salir.
-/// La gestión de usuarios y roles **no está**: `identity` expone roles y
-/// permisos pero no el alta de una cuenta, y una pantalla que solo pudiera
-/// editar a medias sería peor que el script que hoy hace el trabajo (§12,
-/// pregunta abierta 4).
+/// Cuatro cosas: quién eres, quién más entra al sistema, con qué aparatos, y
+/// cómo salir. Las dos de en medio piden su permiso y se ocultan sin él (§13).
+///
+/// Usuarios y roles vive en su **propia pantalla** y no en una sección de esta:
+/// los dispositivos son una lista corta que se revoca de un toque, y las cuentas
+/// llevan alta, roles y acceso, que es más de lo que cabe bajo el perfil sin
+/// enterrar el botón de cerrar sesión.
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
 
@@ -28,6 +32,8 @@ class SettingsScreen extends ConsumerWidget {
     final user = ref.watch(authControllerProvider).valueOrNull;
     final canSeeDevices =
         user?.hasPermission(AppPermissions.syncDevicesManage) ?? false;
+    final canManageUsers =
+        user?.hasPermission(AppPermissions.usersManage) ?? false;
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -41,6 +47,10 @@ class SettingsScreen extends ConsumerWidget {
                 if (user != null) _Profile(user: user),
                 const SizedBox(height: 18),
                 const _PasswordCard(),
+                if (canManageUsers) ...[
+                  const SizedBox(height: 22),
+                  const _UsersEntry(),
+                ],
                 if (canSeeDevices) ...[
                   const SizedBox(height: 22),
                   const _Devices(),
@@ -52,6 +62,40 @@ class SettingsScreen extends ConsumerWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// La puerta a «Usuarios y roles».
+///
+/// El primer administrador sigue saliendo de `create_superuser.py` —alguien
+/// tiene que tener el permiso antes de que nadie pueda repartirlo— y de ahí en
+/// adelante las cuentas se administran desde aquí.
+class _UsersEntry extends StatelessWidget {
+  const _UsersEntry();
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const AppSectionHeader(title: 'Accesos'),
+        const SizedBox(height: 9),
+        AppListCard(
+          title: 'Usuarios y roles',
+          subtitle: 'Quién entra a la app y qué puede hacer',
+          leading: const AppListCardTile(
+            icon: Icons.badge_outlined,
+            background: AppColors.primary50,
+            foreground: AppColors.primary700,
+          ),
+          trailing: const Icon(
+            Icons.chevron_right_rounded,
+            color: AppColors.gray400,
+          ),
+          onTap: () => context.push(UsersScreen.path),
+        ),
+      ],
     );
   }
 }

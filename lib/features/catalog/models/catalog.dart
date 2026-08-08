@@ -20,6 +20,14 @@ enum PricingMode {
         'variable' => PricingMode.variable,
         _ => null,
       };
+
+  /// Lo que viaja al crear un servicio. Es la vuelta de [fromWire] y existe
+  /// desde que el catálogo se puede escribir desde la app.
+  String get wire => switch (this) {
+        PricingMode.perUnit => 'per_unit',
+        PricingMode.tiered => 'tiered',
+        PricingMode.variable => 'variable',
+      };
 }
 
 class ServiceType {

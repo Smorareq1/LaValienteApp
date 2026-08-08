@@ -117,6 +117,78 @@ class AdminServiceOption {
   };
 }
 
+/// Lo que el asistente de alta manda a `POST /catalog/service-types`.
+///
+/// Es una clase aparte de [AdminService] porque lo que se **crea** y lo que se
+/// **lee** no coinciden: aquí no hay ids —los pone el servidor— ni versión ni
+/// precio vigente, y en cambio sí van el código y la modalidad, que son
+/// justamente los dos campos que después no se pueden cambiar.
+class NewService {
+  const NewService({
+    required this.code,
+    required this.name,
+    required this.pricingMode,
+    this.unitLabel,
+    this.sortOrder = 0,
+    this.options = const [],
+  });
+
+  /// `^[a-z][a-z0-9_]*$`, hasta 50. Es a lo que apuntarán los pedidos, así que
+  /// se valida antes de salir en vez de traducir el 422 de pydantic (§14).
+  static final RegExp codePattern = RegExp(r'^[a-z][a-z0-9_]*$');
+
+  /// `^[A-Za-z0-9]{1,20}$` para el código de una opción.
+  static final RegExp optionCodePattern = RegExp(r'^[A-Za-z0-9]{1,20}$');
+
+  final String code;
+  final String name;
+  final PricingMode pricingMode;
+  final String? unitLabel;
+  final int sortOrder;
+
+  /// Solo para `tiered`, y obligatorias ahí: el servidor rechaza un servicio por
+  /// tramos sin ninguna, y una opción en cualquier otra modalidad.
+  final List<NewServiceOption> options;
+
+  Map<String, dynamic> toJson() => <String, dynamic>{
+    'code': code,
+    'name': name,
+    'pricing_mode': pricingMode.wire,
+    'unit_label': unitLabel,
+    'sort_order': sortOrder,
+    'options': [for (final option in options) option.toJson()],
+  };
+}
+
+/// Un tramo del servicio que se está creando, con su rango de piezas.
+class NewServiceOption {
+  const NewServiceOption({
+    required this.code,
+    required this.name,
+    this.minQuantity,
+    this.maxQuantity,
+    this.sortOrder = 0,
+  });
+
+  final String code;
+  final String name;
+
+  /// Los dos extremos son opcionales y el de arriba puede quedar abierto: «de 6
+  /// en adelante» es un tramo tan válido como «de 1 a 5».
+  final int? minQuantity;
+  final int? maxQuantity;
+
+  final int sortOrder;
+
+  Map<String, dynamic> toJson() => <String, dynamic>{
+    'code': code,
+    'name': name,
+    'min_quantity': minQuantity,
+    'max_quantity': maxQuantity,
+    'sort_order': sortOrder,
+  };
+}
+
 /// Un tipo de prenda del §10.2. Los 21 de la boleta vienen sembrados.
 class AdminGarment {
   const AdminGarment({

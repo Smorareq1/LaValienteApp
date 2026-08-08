@@ -8,6 +8,7 @@ import '../../shell/ui/widgets/gradient_header.dart';
 import '../models/catalog.dart';
 import '../models/catalog_admin.dart';
 import '../state/catalog_admin_controller.dart';
+import 'service_wizard_screen.dart';
 import 'widgets/garment_form_sheet.dart';
 
 /// Catálogo (Plan 0006 §10.1 y §10.2).
@@ -50,9 +51,9 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
           ),
         ],
       ),
-      // Un servicio nuevo no se crea desde el teléfono: pide código, modalidad y
-      // —si es por tramos— sus opciones con sus rangos, que es una decisión de
-      // cómo se cobra y no una captura. Las prendas sí: son un nombre.
+      // Una prenda es un nombre y cabe en una sheet; un servicio pide código,
+      // modalidad, sus tramos y el precio de cada uno, así que se crea en el
+      // asistente del §10.1, que no termina hasta que se puede cobrar.
       floatingActionButton: _tab == 1
           ? FloatingActionButton.extended(
               onPressed: () => GarmentFormSheet.show(context),
@@ -61,7 +62,13 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
               icon: const Icon(Icons.add_rounded),
               label: const Text('Prenda'),
             )
-          : null,
+          : FloatingActionButton.extended(
+              onPressed: () => context.push(ServiceWizardScreen.path),
+              backgroundColor: AppColors.primary500,
+              foregroundColor: AppColors.white,
+              icon: const Icon(Icons.add_rounded),
+              label: const Text('Servicio'),
+            ),
     );
   }
 }

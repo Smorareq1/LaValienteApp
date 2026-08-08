@@ -37,6 +37,20 @@ class CatalogRemoteDataSource {
     return AdminService.fromJson(response.data!);
   }
 
+  /// Crea el servicio con sus opciones, si es por tramos.
+  ///
+  /// **Sin precios**: el endpoint no los acepta y no es un descuido, es el
+  /// modelo — un precio es una ventana con fecha (plan 0001 D1) y se registra
+  /// aparte. Por eso el asistente del §10.1 sigue con [registerPrice] y no
+  /// termina hasta haberlos puesto: un servicio sin precio no se puede cobrar.
+  Future<AdminService> createService(NewService input) async {
+    final response = await _dio.post<Map<String, dynamic>>(
+      '/catalog/service-types',
+      data: input.toJson(),
+    );
+    return AdminService.fromJson(response.data!);
+  }
+
   /// Editar un servicio no toca ni el código ni la modalidad: son a lo que
   /// apuntan los pedidos ya tomados y de lo que depende cómo se cobra.
   Future<AdminService> updateService(

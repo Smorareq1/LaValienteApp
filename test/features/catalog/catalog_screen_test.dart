@@ -42,6 +42,10 @@ class _FakeRemote implements CatalogRemoteDataSource {
   }
 
   @override
+  Future<AdminService> createService(NewService input) async =>
+      throw UnimplementedError();
+
+  @override
   Future<AdminService> updateService(
     String id, {
     required String name,

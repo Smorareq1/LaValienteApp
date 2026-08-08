@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
+import '../../features/access/ui/users_screen.dart';
 import '../../features/auth/models/auth_user.dart';
 import '../../features/auth/state/auth_controller.dart';
 import '../../features/auth/ui/forgot_password_screen.dart';
@@ -17,6 +18,7 @@ import '../../features/customers/ui/customer_detail_screen.dart';
 import '../../features/customers/ui/customers_screen.dart';
 import '../../features/catalog/ui/catalog_screen.dart';
 import '../../features/catalog/ui/service_detail_screen.dart';
+import '../../features/catalog/ui/service_wizard_screen.dart';
 import '../../features/inventory/ui/inventory_screen.dart';
 import '../../features/inventory/ui/product_detail_screen.dart';
 import '../../features/home/ui/home_screen.dart';
@@ -27,6 +29,8 @@ import '../../features/orders/ui/order_detail_screen.dart';
 import '../../features/orders/ui/order_deliver_screen.dart';
 import '../../features/orders/ui/orders_screen.dart';
 import '../../features/promotions/ui/promotions_screen.dart';
+import '../../features/scan/models/scan.dart';
+import '../../features/scan/ui/scan_screen.dart';
 import '../../features/shell/ui/app_shell.dart';
 import '../../features/staff/ui/attendance_screen.dart';
 import '../../features/staff/ui/employees_screen.dart';
@@ -51,6 +55,9 @@ const Map<String, List<String>> _routePermissions = {
   '/orders': [AppPermissions.ordersRead],
   // Se evalúa además del de `/orders`: tomar un pedido supone poder verlos.
   OrderCaptureScreen.path: [AppPermissions.ordersCreate],
+  // Escanear también: el borrador solo sirve para acabar en una boleta, y el
+  // servidor exige además `scans.create` al leer la foto.
+  ScanScreen.path: [AppPermissions.ordersCreate],
   '/customers': [AppPermissions.customersRead],
   '/cash': [AppPermissions.expensesRead],
   // Se evalúa además del de `/cash`: vender un insumo supone poder ver la caja.
@@ -66,7 +73,11 @@ const Map<String, List<String>> _routePermissions = {
   '/staff/settings': [AppPermissions.staffManage],
   CatalogScreen.path: [AppPermissions.catalogManage],
   ServiceDetailScreen.path: [AppPermissions.catalogManage],
+  ServiceWizardScreen.path: [AppPermissions.catalogManage],
   '/promotions': [AppPermissions.promotionsManage],
+  // `/settings` a secas solo pide sesión —el perfil es de todos—, así que la
+  // administración de cuentas pone su propia puerta.
+  UsersScreen.path: [AppPermissions.usersManage],
 };
 
 /// Router de la app con auth guard reactivo:
@@ -157,9 +168,19 @@ GoRouter appRouter(Ref ref) {
       // Va **antes** del shell a propósito: dentro de la rama de Pedidos vive
       // `/orders/:id`, que también casaría con "new". Gana la primera que
       // coincide, y esta se declara primero.
+      // El escaneo va **antes** que `/orders/new` y que la rama de Pedidos por
+      // lo mismo que la toma: `/orders/:id` también casaría con "scan".
+      GoRoute(
+        path: ScanScreen.path,
+        builder: (context, state) => const ScanScreen(),
+      ),
       GoRoute(
         path: OrderCaptureScreen.path,
-        builder: (context, state) => const OrderCaptureScreen(),
+        // El borrador viaja como `extra` y no en la ruta: es un prellenado, no
+        // una dirección. `/orders/new` guardado en un enlace tiene que seguir
+        // significando "boleta en blanco".
+        builder: (context, state) =>
+            OrderCaptureScreen(scan: _scanFromExtra(state.extra)),
       ),
       // Corregir una boleta es la misma pantalla precargada (plan 0001 §7.3),
       // así que vive donde ella: fuera del shell, porque el footer del total
@@ -193,6 +214,12 @@ GoRouter appRouter(Ref ref) {
       // suyas por el camino y GoRouter se queda con la primera que coincide.
       // El detalle del servicio va antes que `/catalog` por lo mismo que las de
       // personal: es una ruta hija suya y la primera coincidencia gana.
+      // El asistente va **antes** que el detalle por lo mismo que `/orders/new`:
+      // `/catalog/services/:id` también casaría con "new" y gana la primera.
+      GoRoute(
+        path: ServiceWizardScreen.path,
+        builder: (context, state) => const ServiceWizardScreen(),
+      ),
       GoRoute(
         path: ServiceDetailScreen.path,
         builder: (context, state) =>
@@ -201,6 +228,12 @@ GoRouter appRouter(Ref ref) {
       GoRoute(
         path: CatalogScreen.path,
         builder: (context, state) => const CatalogScreen(),
+      ),
+      // Antes que `/settings` por lo mismo que las dos de personal: es una ruta
+      // hija suya por el camino y gana la primera que coincide.
+      GoRoute(
+        path: UsersScreen.path,
+        builder: (context, state) => const UsersScreen(),
       ),
       GoRoute(
         path: SettingsScreen.path,
@@ -334,6 +367,13 @@ OrderStatus? _statusFromExtra(Object? extra) {
   if (extra is! Map) return null;
   final status = extra['status'];
   return status is String ? OrderStatus.fromWire(status) : null;
+}
+
+/// El borrador con el que el escaneo abre la boleta, si vino uno.
+ScanResult? _scanFromExtra(Object? extra) {
+  if (extra is! Map) return null;
+  final scan = extra['scan'];
+  return scan is ScanResult ? scan : null;
 }
 
 /// Comprueba el permiso mínimo de [location] contra los permisos de [user].

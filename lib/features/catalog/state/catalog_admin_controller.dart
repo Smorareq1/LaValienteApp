@@ -4,6 +4,7 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../core/errors/app_failure.dart';
 import '../data/catalog_remote_datasource.dart';
+import '../models/catalog.dart';
 import '../models/catalog_admin.dart';
 
 part 'catalog_admin_controller.g.dart';
@@ -36,6 +37,91 @@ class ServicesAdminController extends _$ServicesAdminController {
     } catch (error) {
       return Left(AppFailure.fromException(error));
     }
+  }
+}
+
+/// Cómo quedó un alta de servicio.
+///
+/// Lleva [unpriced] porque crear un servicio con precios son **varias llamadas**
+/// —el `POST` del servicio y un `POST` por cada precio— y la mitad puede fallar
+/// con el servicio ya creado. Reintentar el alta entera chocaría contra el
+/// código, que es único, así que lo honesto es decir qué quedó sin precio y
+/// dejar a quien lo creó en el detalle, donde están los botones para terminarlo.
+class ServiceCreation {
+  const ServiceCreation({required this.service, this.unpriced = const []});
+
+  final AdminService service;
+
+  /// Lo que se quedó sin precio: el nombre del servicio, o el de cada opción.
+  final List<String> unpriced;
+
+  bool get isComplete => unpriced.isEmpty;
+}
+
+/// El alta de un servicio del §10.1.
+///
+/// Un servicio sin precio no se puede cobrar —el motor lo cuenta como faltante y
+/// el servidor rechaza el pedido—, así que el asistente no termina hasta
+/// haberlos registrado. Los de precio variable son la excepción: ahí el monto lo
+/// teclea quien captura, y no hay ventana que abrir.
+@riverpod
+class ServiceCreator extends _$ServiceCreator {
+  @override
+  void build() {}
+
+  /// [prices] va en centavos, con el **código de la opción** por llave y `null`
+  /// para el precio del propio servicio. Por código y no por posición porque los
+  /// ids los pone el servidor y solo se conocen después del `POST`.
+  Future<Either<AppFailure, ServiceCreation>> create(
+    NewService input, {
+    Map<String?, int> prices = const {},
+    required String validFrom,
+  }) async {
+    final remote = ref.read(catalogRemoteDataSourceProvider);
+
+    final AdminService created;
+    try {
+      created = await remote.createService(input);
+    } catch (error) {
+      return Left(AppFailure.fromException(error));
+    }
+
+    // A partir de aquí el servicio ya existe: lo que falle se reporta, no se
+    // deshace. El catálogo no tiene borrado y fingir una transacción que la API
+    // no ofrece sería peor que decir qué falta.
+    final unpriced = <String>[];
+
+    Future<void> put(String? optionCode, String label, String? optionId) async {
+      final amount = prices[optionCode];
+      if (amount == null) {
+        unpriced.add(label);
+        return;
+      }
+      try {
+        await remote.registerPrice(
+          created.id,
+          amount: amount,
+          validFrom: validFrom,
+          optionId: optionId,
+        );
+      } catch (_) {
+        unpriced.add(label);
+      }
+    }
+
+    switch (input.pricingMode) {
+      case PricingMode.perUnit:
+        await put(null, created.name, null);
+      case PricingMode.tiered:
+        for (final option in created.options) {
+          await put(option.code, option.name, option.id);
+        }
+      case PricingMode.variable:
+        break;
+    }
+
+    ref.invalidate(servicesAdminControllerProvider);
+    return Right(ServiceCreation(service: created, unpriced: unpriced));
   }
 }
 

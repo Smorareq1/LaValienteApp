@@ -3,6 +3,7 @@ import 'package:fpdart/fpdart.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../core/errors/app_failure.dart';
+import '../../access/models/access.dart';
 import '../data/staff_remote_datasource.dart';
 import '../models/staff.dart';
 

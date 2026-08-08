@@ -5,9 +5,12 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/auth/app_permissions.dart';
 import '../../../core/money/fixed2.dart';
+import '../../../core/network/connectivity.dart';
 import '../../../core/time/business_date.dart';
 import '../../auth/ui/widgets/permission_gate.dart';
 import '../../customers/ui/widgets/customer_picker.dart';
+import '../../scan/models/scan.dart';
+import '../../scan/ui/scan_screen.dart';
 import '../domain/order_capture.dart';
 import '../state/order_capture_controller.dart';
 import 'widgets/capture_section.dart';
@@ -26,13 +29,18 @@ import 'widgets/services_section.dart';
 /// clientes, el total. Guardar deja el pedido en pantalla y una operación en el
 /// outbox; la red decide cuándo, no si.
 class OrderCaptureScreen extends ConsumerStatefulWidget {
-  const OrderCaptureScreen({super.key, this.orderId});
+  const OrderCaptureScreen({super.key, this.orderId, this.scan});
 
   static const String path = '/orders/new';
 
   /// Con valor, la pantalla abre **corrigiendo** ese pedido (§7.3): mismas
   /// secciones, misma aritmética, pero precargada y guardando encima.
   final String? orderId;
+
+  /// Con valor, la boleta llega prellenada desde una foto (§5.3 → plan 0003).
+  /// Sigue siendo esta pantalla la que guarda, y sigue siendo una persona la
+  /// que decide: el escaneo prellena, nunca confirma.
+  final ScanResult? scan;
 
   @override
   ConsumerState<OrderCaptureScreen> createState() => _OrderCaptureScreenState();
@@ -75,7 +83,7 @@ class _OrderCaptureScreenState extends ConsumerState<OrderCaptureScreen> {
   var _prefilled = false;
 
   void _prefill(OrderCaptureState state) {
-    if (_prefilled || !state.isEditing) return;
+    if (_prefilled || !(state.isEditing || state.isFromScan)) return;
     _prefilled = true;
     _booklet.text = state.bookletSerial;
     _nit.text = state.nit;
@@ -83,6 +91,28 @@ class _OrderCaptureScreenState extends ConsumerState<OrderCaptureScreen> {
     _observations.text = state.observations;
     _discountAmount.text = state.discountAmountText;
     _discountDescription.text = state.discountDescription;
+  }
+
+  /// Vuelca el escaneo en cuanto el catálogo terminó de cargar.
+  ///
+  /// Aquí y no en el `build` del controlador porque el borrador llega por la
+  /// navegación y no por la clave del provider: hacerlo parte de la clave
+  /// obligaría a que `/orders/new` y `/orders/new` desde un escaneo fueran dos
+  /// pantallas distintas para GoRouter.
+  var _scanApplied = false;
+
+  void _applyScan(OrderCaptureState state) {
+    final scan = widget.scan;
+    if (_scanApplied || scan == null || state.isFromScan) return;
+    _scanApplied = true;
+    // Fuera del frame en curso: `applyScan` publica estado nuevo y hacerlo
+    // durante el `build` que lo leyó es justo lo que Riverpod prohíbe.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      ref
+          .read(orderCaptureControllerProvider(widget.orderId).notifier)
+          .applyScan(scan);
+    });
   }
 
   void _toggle(int step) {
@@ -148,7 +178,10 @@ class _OrderCaptureScreenState extends ConsumerState<OrderCaptureScreen> {
     );
     final editing = asyncState.valueOrNull?.editing;
     final loaded = asyncState.valueOrNull;
-    if (loaded != null) _prefill(loaded);
+    if (loaded != null) {
+      _applyScan(loaded);
+      _prefill(loaded);
+    }
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -249,6 +282,117 @@ class _Footer extends StatelessWidget {
   }
 }
 
+/// El aviso de que esta boleta la llenó una máquina (plan 0003 §4).
+///
+/// No es decorativo: quien captura tiene que saber que lo que está viendo es una
+/// lectura y no un dato, porque la diferencia entre revisar y confiar es lo que
+/// separa este módulo de uno que guarda pedidos equivocados.
+class _ScannedBanner extends StatelessWidget {
+  const _ScannedBanner({required this.reviewCount});
+
+  final int reviewCount;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: AppColors.warningBg,
+        borderRadius: AppRadius.mdAll,
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(
+            Icons.document_scanner_outlined,
+            size: 18,
+            color: AppColors.warningText,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              reviewCount == 0
+                  ? 'Boleta escaneada. Revisá los campos antes de guardar: el '
+                        'cliente hay que confirmarlo a mano.'
+                  : 'Boleta escaneada. $reviewCount ${reviewCount == 1 ? "campo salió" : "campos salieron"} '
+                        'dudoso${reviewCount == 1 ? "" : "s"} — revisalos antes de guardar.',
+              style: AppTypography.bodySm.copyWith(
+                fontSize: 13,
+                color: AppColors.warningText,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// La entrada al escaneo desde la boleta en blanco (§5.2).
+///
+/// Solo si hay señal: es online-only (D8) y un botón que solo puede fallar es
+/// peor que no tenerlo. La captura a mano sigue entera debajo.
+class _ScanEntry extends ConsumerWidget {
+  const _ScanEntry();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final online = ref.watch(connectivityChangesProvider).valueOrNull ?? true;
+
+    return Material(
+      color: online ? AppColors.primary50 : AppColors.gray100,
+      borderRadius: AppRadius.mdAll,
+      child: InkWell(
+        onTap: online ? () => context.push(ScanScreen.path) : null,
+        borderRadius: AppRadius.mdAll,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          child: Row(
+            children: [
+              Icon(
+                Icons.document_scanner_outlined,
+                size: 20,
+                color: online ? AppColors.primary700 : AppColors.gray400,
+              ),
+              const SizedBox(width: 11),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Escanear la boleta',
+                      style: AppTypography.bodySm.copyWith(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: online
+                            ? AppColors.primary700
+                            : AppColors.textSecondary,
+                      ),
+                    ),
+                    Text(
+                      online
+                          ? 'Tomale una foto y llegá con esto lleno.'
+                          : 'Necesita señal. Capturá a mano mientras tanto.',
+                      style: AppTypography.helper.copyWith(
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (online)
+                const Icon(
+                  Icons.chevron_right_rounded,
+                  color: AppColors.primary700,
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _Form extends ConsumerWidget {
   const _Form({
     required this.state,
@@ -288,6 +432,13 @@ class _Form extends ConsumerWidget {
     return ListView(
       padding: const EdgeInsets.fromLTRB(14, 12, 14, 20),
       children: [
+        if (state.isFromScan) ...[
+          _ScannedBanner(reviewCount: state.scanReviewCount),
+          const SizedBox(height: 10),
+        ] else if (!state.isEditing) ...[
+          const _ScanEntry(),
+          const SizedBox(height: 10),
+        ],
         CaptureSection(
           step: 1,
           title: 'Encabezado',

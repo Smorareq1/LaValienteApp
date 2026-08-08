@@ -10,6 +10,7 @@ import '../../catalog/models/catalog.dart';
 import '../../customers/data/customers_repository.dart';
 import '../../customers/models/customer.dart';
 import '../../promotions/data/promotions_repository.dart';
+import '../../scan/models/scan.dart';
 import '../data/orders_repository.dart';
 import '../domain/order_capture.dart';
 import '../domain/order_pricing.dart';
@@ -52,6 +53,8 @@ class OrderCaptureState {
     this.paymentMethod = PaymentMethod.cash,
     this.paymentReference = '',
     this.saving = false,
+    this.scanId,
+    this.scanReviewCount = 0,
   });
 
   final DateTime orderDate;
@@ -103,6 +106,15 @@ class OrderCaptureState {
   final String paymentReference;
 
   final bool saving;
+
+  /// El escaneo del que salió esta boleta (plan 0003 D7), si vino de uno.
+  final String? scanId;
+
+  /// Cuántos campos llegaron marcados «revisar». Solo alimenta el aviso de
+  /// arriba: quien captura tiene que saber que esto no lo escribió una persona.
+  final int scanReviewCount;
+
+  bool get isFromScan => scanId != null;
 
   int? get weightLbs => Fixed2.parse(weightText);
 
@@ -262,6 +274,7 @@ class OrderCaptureState {
                 ? _clean(paymentReference)
                 : null,
           ),
+    scanId: scanId,
   );
 
   OrderCaptureState copyWith({
@@ -289,6 +302,8 @@ class OrderCaptureState {
     PaymentMethod? paymentMethod,
     String? paymentReference,
     bool? saving,
+    String? scanId,
+    int? scanReviewCount,
   }) {
     return OrderCaptureState(
       orderDate: orderDate ?? this.orderDate,
@@ -314,6 +329,8 @@ class OrderCaptureState {
       paymentMethod: paymentMethod ?? this.paymentMethod,
       paymentReference: paymentReference ?? this.paymentReference,
       saving: saving ?? this.saving,
+      scanId: scanId ?? this.scanId,
+      scanReviewCount: scanReviewCount ?? this.scanReviewCount,
     );
   }
 
@@ -427,6 +444,79 @@ class OrderCaptureController extends _$OrderCaptureController {
       selectedPromotions: selected,
       discountAmountText: manualAmount,
       discountDescription: manualDescription,
+    );
+  }
+
+  /// Vuelca un borrador de escaneo sobre la boleta en pantalla (plan 0003 §4).
+  ///
+  /// Es el gemelo de [_prefill], y la diferencia importa: aquel reconstruye algo
+  /// que **ya se guardó** y esto vuelca algo que **una máquina leyó**. Por eso
+  /// nada de aquí se da por bueno —el `scanId` viaja para que después se pueda
+  /// medir cuánto hubo que corregir (D7)— y por eso los campos con poca
+  /// confianza llegan marcados en vez de silenciosamente llenos.
+  ///
+  /// Lo que **no** hace: elegir al cliente. La sugerencia del §7.5 se enseña en
+  /// la pantalla del escaneo como pregunta y se confirma aquí a mano. Aceptarla
+  /// sola archivaría la ropa de alguien bajo el nombre de otro.
+  Future<void> applyScan(ScanResult scan) async {
+    final draft = scan.draft;
+    final current = state.valueOrNull;
+    if (draft == null || current == null) return;
+
+    final byCode = {for (final service in current.services) service.code: service};
+    final quantities = <String, int>{};
+    final variableAmounts = <String, String>{};
+    var washByWeight = false;
+    var weightText = current.weightText;
+
+    for (final line in draft.charges) {
+      final service = byCode[line.serviceCode];
+      // Un servicio que este dispositivo no conoce se ignora: el catálogo local
+      // manda, y prellenar un código que la boleta no puede cobrar solo
+      // produciría un error al guardar.
+      if (service == null) continue;
+
+      if (service.code == kWashByWeightCode) {
+        washByWeight = true;
+        // Las libras son el mismo número que el encabezado, escrito una sola
+        // vez (§3.1): la línea las trae y el campo de peso las recibe.
+        weightText = Fixed2.format(line.quantity);
+        continue;
+      }
+      if (service.pricingMode == PricingMode.variable) {
+        if (line.amount != null) {
+          variableAmounts[service.code] = Fixed2.format(line.amount!);
+        }
+        continue;
+      }
+      // Los steppers cuentan unidades y la línea viaja en centésimas.
+      quantities[serviceKey(service.code, line.optionCode)] =
+          (line.quantity / 100).round();
+    }
+
+    final known = {for (final kind in current.garmentTypes) kind.id};
+    final garments = <String, int>{
+      for (final line in draft.garments)
+        if (known.contains(line.garmentTypeId)) line.garmentTypeId: line.quantity,
+    };
+
+    if (!washByWeight && draft.weightLbs.value != null) {
+      weightText = Fixed2.format(draft.weightLbs.value!);
+    }
+
+    state = AsyncData(
+      current.copyWith(
+        bookletSerial: draft.bookletSerial.value ?? current.bookletSerial,
+        nit: draft.nit.value ?? current.nit,
+        weightText: weightText,
+        washByWeight: washByWeight,
+        observations: draft.observations.value ?? current.observations,
+        garmentQuantities: garments,
+        serviceQuantities: quantities,
+        variableAmounts: variableAmounts,
+        scanId: scan.id,
+        scanReviewCount: draft.reviewCount,
+      ),
     );
   }
 

@@ -435,6 +435,10 @@ class OrdersRepository {
 
     return <String, dynamic>{
       'order_date': capture.orderDate,
+      // Solo en el alta: es de dónde salió esta boleta, no un campo que se
+      // corrija después. Una corrección posterior ya no es lo que el modelo
+      // propuso, y contarla contra él falsearía la métrica de D7.
+      if (capture.scanId != null) 'scan_id': capture.scanId,
       ..._body(capture),
       if (payment != null)
         'advance_payment': <String, dynamic>{

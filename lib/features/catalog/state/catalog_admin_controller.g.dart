@@ -303,6 +303,29 @@ final servicesAdminControllerProvider =
 
 typedef _$ServicesAdminController =
     AutoDisposeAsyncNotifier<List<AdminService>>;
+String _$serviceCreatorHash() => r'a20643493586190e3e23317f722e0de578f28f89';
+
+/// El alta de un servicio del §10.1.
+///
+/// Un servicio sin precio no se puede cobrar —el motor lo cuenta como faltante y
+/// el servidor rechaza el pedido—, así que el asistente no termina hasta
+/// haberlos registrado. Los de precio variable son la excepción: ahí el monto lo
+/// teclea quien captura, y no hay ventana que abrir.
+///
+/// Copied from [ServiceCreator].
+@ProviderFor(ServiceCreator)
+final serviceCreatorProvider =
+    AutoDisposeNotifierProvider<ServiceCreator, void>.internal(
+      ServiceCreator.new,
+      name: r'serviceCreatorProvider',
+      debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
+          ? null
+          : _$serviceCreatorHash,
+      dependencies: null,
+      allTransitiveDependencies: null,
+    );
+
+typedef _$ServiceCreator = AutoDisposeNotifier<void>;
 String _$priceRegistrarHash() => r'3757aae820c9c12ba06108e162fa5665b00b5753';
 
 /// Registra un precio nuevo.

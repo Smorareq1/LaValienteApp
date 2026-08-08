@@ -52,6 +52,7 @@ class OrderCapture {
     this.observations,
     this.discounts = const [],
     this.advancePayment,
+    this.scanId,
   });
 
   /// Fecha de negocio en `YYYY-MM-DD`.
@@ -68,6 +69,14 @@ class OrderCapture {
   final List<ChargeDraft> charges;
   final List<DiscountDraft> discounts;
   final PaymentDraft? advancePayment;
+
+  /// El escaneo del que salió esta boleta, si vino de uno (plan 0003 D7).
+  ///
+  /// Viaja hasta el servidor para que ahí se guarde el **diff** entre lo que el
+  /// modelo propuso y lo que la persona realmente guardó. Ese dataset es la
+  /// única medida de calidad tomada sobre boletas reales, y sin este campo el
+  /// escaneo no se podría mejorar con nada más que impresiones.
+  final String? scanId;
 
   /// El "No. Piezas" de la boleta. Se suma, nunca se digita (§3.3).
   int get totalPieces => garments.fold(0, (sum, item) => sum + item.quantity);

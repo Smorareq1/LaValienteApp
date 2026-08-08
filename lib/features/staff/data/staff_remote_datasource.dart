@@ -4,6 +4,7 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../core/money/fixed2.dart';
 import '../../../core/network/api_client.dart';
+import '../../access/models/access.dart';
 import '../domain/overtime.dart';
 import '../models/staff.dart';
 
@@ -182,33 +183,6 @@ class ShiftInput {
     'sort_order': sortOrder,
     if (!withCode) 'is_active': isActive,
   };
-}
-
-/// Una cuenta del sistema, tal como la lista `/authorization/users`. Solo lo que
-/// el desplegable necesita para que alguien la reconozca.
-class SystemUser {
-  const SystemUser({
-    required this.id,
-    required this.username,
-    required this.isActive,
-    this.fullName,
-  });
-
-  factory SystemUser.fromJson(Map<String, dynamic> json) => SystemUser(
-    id: json['id'] as String,
-    username: json['username'] as String,
-    isActive: json['is_active'] as bool,
-    fullName: json['full_name'] as String?,
-  );
-
-  final String id;
-  final String username;
-  final bool isActive;
-  final String? fullName;
-
-  /// `Marta González (mostrador)`, o solo el usuario si no tiene nombre.
-  String get label =>
-      fullName == null || fullName!.isEmpty ? username : '$fullName ($username)';
 }
 
 @Riverpod(keepAlive: true)
