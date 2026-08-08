@@ -8,6 +8,7 @@ import '../../customers/data/customer_mirror.dart';
 import '../../inventory/data/inventory_mirrors.dart';
 import '../../orders/data/order_mirrors.dart';
 import '../../promotions/data/promotion_mirror.dart';
+import '../../staff/data/staff_mirrors.dart';
 import 'entity_mirror.dart';
 
 part 'sync_mirrors.g.dart';
@@ -31,6 +32,7 @@ Map<String, SyncEntityMirror> syncMirrors(Ref ref) {
     PromotionMirror(database),
     ...cashMirrors(database),
     ...inventoryMirrors(database),
+    ...staffMirrors(database),
   ];
   return {for (final mirror in mirrors) mirror.entity: mirror};
 }

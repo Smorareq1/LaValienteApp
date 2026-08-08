@@ -120,6 +120,8 @@ class ExpensesLocalDataSource {
     required ExpenseStatus status,
     required String createdById,
     String? observations,
+    String? employeeId,
+    String? attendanceRecordId,
   }) {
     return _database
         .into(_database.expenseEntries)
@@ -135,6 +137,8 @@ class ExpensesLocalDataSource {
             status: status.wire,
             observations: Value(observations),
             createdById: createdById,
+            employeeId: Value(employeeId),
+            attendanceRecordId: Value(attendanceRecordId),
           ),
         );
   }

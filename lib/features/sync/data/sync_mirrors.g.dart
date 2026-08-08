@@ -6,7 +6,7 @@ part of 'sync_mirrors.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$syncMirrorsHash() => r'473e4cc870de59cecdaa389df6161cc91b0fed61';
+String _$syncMirrorsHash() => r'b038fc6fb73e436482caddbe29171cda77c4e762';
 
 /// Espejos registrados, por nombre de entidad en el feed.
 ///

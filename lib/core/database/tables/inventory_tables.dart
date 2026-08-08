@@ -87,3 +87,30 @@ class SupplySaleItemEntries extends Table with SyncedColumns {
   TextColumn get unitPrice => text().withLength(max: 20)();
   TextColumn get amount => text().withLength(max: 20)();
 }
+
+/// El kardex. Baja para que el dispositivo pueda **explicar** el stock que
+/// muestra: sin los movimientos, un lote que amaneció con menos es un número sin
+/// historia.
+@DataClassName('InventoryMovementEntry')
+class InventoryMovementEntries extends Table with SyncedColumns {
+  TextColumn get lotId => text()();
+
+  /// `purchase_in`, `sale_out`, `internal_use` o `adjustment`. Los dos primeros
+  /// los escribe el sistema —salen de registrar un lote y de vender—; los otros
+  /// dos son los que una persona teclea.
+  TextColumn get movementType => text().withLength(max: 20)();
+
+  /// Sin signo salvo en un `adjustment`, que es el único que puede ser negativo:
+  /// un conteo que salió corto. La dirección de los demás está en su nombre.
+  TextColumn get quantity => text().withLength(max: 20)();
+
+  /// A cuánto salió, en una venta. Nulo en todo lo demás.
+  TextColumn get unitPrice => text().withLength(max: 20).nullable()();
+
+  TextColumn get supplySaleItemId => text().nullable()();
+  TextColumn get notes => text().nullable()();
+  TextColumn get createdById => text()();
+
+  /// La fecha del movimiento, que es como se lee el kardex.
+  DateTimeColumn get createdAt => dateTime().nullable()();
+}

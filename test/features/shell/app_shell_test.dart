@@ -202,15 +202,11 @@ void main() {
     await tester.tap(find.text('Más'));
     await tester.pumpAndSettle();
 
-    // Sincronización y Promociones quedan fuera: son las del hub que ya tienen
-    // pantalla real (UI 1 y UI 5).
-    const entries = [
-      'Insumos',
-      'Personal',
-      'Catálogo',
-      'Cierres de días pasados',
-      'Ajustes',
-    ];
+    // Fuera quedan las del hub que ya tienen pantalla real: Sincronización
+    // (UI 1), Promociones (UI 5) e Insumos y Personal (UI 7). Esas dos leen del
+    // espejo local, así que se prueban donde se les puede dar una base en
+    // memoria —cada una en su propio archivo— y no desde el shell.
+    const entries = ['Catálogo', 'Cierres de días pasados', 'Ajustes'];
 
     for (final entry in entries) {
       await tester.tap(find.text(entry));

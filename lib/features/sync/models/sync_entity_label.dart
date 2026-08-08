@@ -10,5 +10,6 @@ String syncEntityLabel(String entity, {required int count}) => switch (entity) {
   'customer' => count == 1 ? 'Cliente' : 'Clientes',
   'expense' => count == 1 ? 'Gasto' : 'Gastos',
   'supply_sale' => count == 1 ? 'Venta de insumo' : 'Ventas de insumo',
+  'attendance_record' => count == 1 ? 'Jornada' : 'Jornadas',
   _ => entity,
 };

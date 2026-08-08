@@ -341,7 +341,7 @@ class _ReviewSubjectProviderElement
 }
 
 String _$reviewQueueControllerHash() =>
-    r'65fb08bae38d320cd988c1960baed84ff176be94';
+    r'97f28d7396d2b47d16edf621b1884619765d6db3';
 
 /// Las dos decisiones que se pueden tomar sobre una entrada: descartarla o
 /// volver a mandarla.

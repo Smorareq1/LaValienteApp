@@ -48,6 +48,8 @@ enum ReviewKind {
   expenseCreate,
   expenseUpdate,
   supplySaleCreate,
+  attendanceCreate,
+  attendanceUpdate,
   unknown;
 
   static ReviewKind fromOperation(String entity, String opType) =>
@@ -67,6 +69,11 @@ enum ReviewKind {
         // admin y el mostrador no lo captura, así que ninguna operación de esa
         // forma sale de esta app.
         ('supply_sale', 'create') => ReviewKind.supplySaleCreate,
+        // Marcar entrada y marcar salida son la misma entidad y el mismo
+        // permiso, pero dos operaciones: la segunda edita la fila que abrió la
+        // primera, y por eso una llega aquí con `base_version` y la otra no.
+        ('attendance_record', 'create') => ReviewKind.attendanceCreate,
+        ('attendance_record', 'update') => ReviewKind.attendanceUpdate,
         _ => ReviewKind.unknown,
       };
 
@@ -84,6 +91,8 @@ enum ReviewKind {
     ReviewKind.expenseCreate => 'Gasto nuevo',
     ReviewKind.expenseUpdate => 'Corrección de un gasto',
     ReviewKind.supplySaleCreate => 'Venta de insumo',
+    ReviewKind.attendanceCreate => 'Entrada de una jornada',
+    ReviewKind.attendanceUpdate => 'Cierre de una jornada',
     ReviewKind.unknown => 'Operación',
   };
 
@@ -98,7 +107,8 @@ enum ReviewKind {
       this == ReviewKind.paymentCreate ||
       this == ReviewKind.customerCreate ||
       this == ReviewKind.expenseCreate ||
-      this == ReviewKind.supplySaleCreate;
+      this == ReviewKind.supplySaleCreate ||
+      this == ReviewKind.attendanceCreate;
 }
 
 /// Una captura que el servidor no aceptó y espera una decisión humana
@@ -186,6 +196,12 @@ class ReviewItem {
     // cifra aquí sería afirmar un monto que quizá nunca fue.
     ReviewKind.supplySaleCreate =>
       '${_count(localPayload['lines'])} ${_count(localPayload['lines']) == 1 ? 'producto' : 'productos'}',
+    // Sin el nombre de la persona: el cuerpo lleva su id y nada más. Quién es se
+    // resuelve contra el espejo y se muestra en el detalle, no aquí.
+    ReviewKind.attendanceCreate => 'Entró a las ${_clock(localPayload['clock_in'])}',
+    ReviewKind.attendanceUpdate => localPayload['clock_out'] != null
+        ? 'Salió a las ${_clock(localPayload['clock_out'])}'
+        : 'Corrección de la jornada',
     ReviewKind.unknown => '$entity · $opType',
   };
 
@@ -246,10 +262,31 @@ class ReviewItem {
         ReviewFact('Fecha', localPayload['sale_date'] as String),
       if (localPayload['nit'] != null) ReviewFact('NIT', localPayload['nit'] as String),
     ],
+    ReviewKind.attendanceCreate || ReviewKind.attendanceUpdate => [
+      if (localPayload['work_date'] != null)
+        ReviewFact('Día', localPayload['work_date'] as String),
+      if (localPayload['clock_in'] != null)
+        ReviewFact('Entrada', _clock(localPayload['clock_in'])),
+      if (localPayload['clock_out'] != null)
+        ReviewFact('Salida', _clock(localPayload['clock_out'])),
+      // Los minutos que alguien confirmó, no los que el sistema sugirió: la
+      // sugerencia no viaja en el cuerpo y esa es toda la diferencia (D8).
+      if (localPayload['overtime_minutes'] case final int minutes when minutes > 0)
+        ReviewFact('Minutos extra', '$minutes'),
+      if (localPayload['notes'] != null) ReviewFact('Notas', localPayload['notes'] as String),
+    ],
     ReviewKind.unknown => const [],
   };
 
   static int _count(Object? list) => list is List ? list.length : 0;
+
+  /// `06:50:00` → `6:50`. La hora tal como se dice, no como se transmite.
+  static String _clock(Object? wire) {
+    if (wire is! String) return '—';
+    final parts = wire.split(':');
+    if (parts.length < 2) return wire;
+    return '${int.tryParse(parts[0]) ?? parts[0]}:${parts[1]}';
+  }
 
   static int _sum(Object? list, String field) {
     if (list is! List) return 0;
