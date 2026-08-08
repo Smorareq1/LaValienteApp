@@ -15,6 +15,8 @@ import '../../features/cash/ui/day_close_screen.dart';
 import '../../features/cash/ui/supply_sale_screen.dart';
 import '../../features/customers/ui/customer_detail_screen.dart';
 import '../../features/customers/ui/customers_screen.dart';
+import '../../features/catalog/ui/catalog_screen.dart';
+import '../../features/catalog/ui/service_detail_screen.dart';
 import '../../features/inventory/ui/inventory_screen.dart';
 import '../../features/inventory/ui/product_detail_screen.dart';
 import '../../features/home/ui/home_screen.dart';
@@ -27,7 +29,9 @@ import '../../features/orders/ui/orders_screen.dart';
 import '../../features/promotions/ui/promotions_screen.dart';
 import '../../features/shell/ui/app_shell.dart';
 import '../../features/staff/ui/attendance_screen.dart';
-import '../../features/shell/ui/module_placeholder_screen.dart';
+import '../../features/staff/ui/employees_screen.dart';
+import '../../features/staff/ui/staff_settings_screen.dart';
+import '../../features/settings/ui/settings_screen.dart';
 import '../../features/sync/ui/review_detail_screen.dart';
 import '../../features/sync/ui/review_queue_screen.dart';
 import '../../features/sync/ui/sync_screen.dart';
@@ -60,27 +64,10 @@ const Map<String, List<String>> _routePermissions = {
   '/staff': [AppPermissions.attendanceRecord, AppPermissions.staffRead],
   '/staff/employees': [AppPermissions.staffRead],
   '/staff/settings': [AppPermissions.staffManage],
-  '/catalog': [AppPermissions.catalogManage],
+  CatalogScreen.path: [AppPermissions.catalogManage],
+  ServiceDetailScreen.path: [AppPermissions.catalogManage],
   '/promotions': [AppPermissions.promotionsManage],
 };
-
-/// Rutas de los módulos que "Más" ya ofrece pero que su fase de UI aún no
-/// construye (Plan 0006 §16). El permiso lo sigue aplicando [_routePermissions],
-/// así que el marcador solo lo ve quien tendría acceso a la pantalla real.
-final List<RouteBase> _pendingModules = [
-  for (final module in const [
-    (path: '/catalog', title: 'Catálogo', icon: Icons.sell_outlined, phase: 'UI 10'),
-    (path: '/settings', title: 'Ajustes', icon: Icons.settings_outlined, phase: 'UI 10'),
-  ])
-    GoRoute(
-      path: module.path,
-      builder: (context, state) => ModulePlaceholderScreen(
-        title: module.title,
-        icon: module.icon,
-        phase: module.phase,
-      ),
-    ),
-];
 
 /// Router de la app con auth guard reactivo:
 /// - Mientras se restaura la sesión → splash.
@@ -202,6 +189,31 @@ GoRouter appRouter(Ref ref) {
           ),
         ],
       ),
+      // Las dos de administración van **antes** que `/staff`: son rutas hijas
+      // suyas por el camino y GoRouter se queda con la primera que coincide.
+      // El detalle del servicio va antes que `/catalog` por lo mismo que las de
+      // personal: es una ruta hija suya y la primera coincidencia gana.
+      GoRoute(
+        path: ServiceDetailScreen.path,
+        builder: (context, state) =>
+            ServiceDetailScreen(serviceId: state.pathParameters['id']!),
+      ),
+      GoRoute(
+        path: CatalogScreen.path,
+        builder: (context, state) => const CatalogScreen(),
+      ),
+      GoRoute(
+        path: SettingsScreen.path,
+        builder: (context, state) => const SettingsScreen(),
+      ),
+      GoRoute(
+        path: EmployeesScreen.path,
+        builder: (context, state) => const EmployeesScreen(),
+      ),
+      GoRoute(
+        path: StaffSettingsScreen.path,
+        builder: (context, state) => const StaffSettingsScreen(),
+      ),
       GoRoute(
         path: AttendanceScreen.path,
         builder: (context, state) => const AttendanceScreen(),
@@ -232,10 +244,6 @@ GoRouter appRouter(Ref ref) {
         path: PromotionsScreen.path,
         builder: (context, state) => const PromotionsScreen(),
       ),
-      // Los módulos del hub "Más". Existen desde ya, aunque sea como marcador,
-      // porque el hub los ofrece: una entrada visible que cae en la pantalla de
-      // ruta desconocida se lee como una app rota, no como una fase pendiente.
-      ..._pendingModules,
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) =>
             AppShell(navigationShell: navigationShell),

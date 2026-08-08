@@ -1,4 +1,5 @@
 import '../../../core/database/tables/synced_columns.dart';
+import '../../../core/money/fixed2.dart';
 import '../domain/overtime.dart';
 // El mismo módulo, con prefijo: `EmployeeDay` expone getters que se llaman igual
 // que las funciones puras que consulta, y sin el prefijo el getter se llamaría a
@@ -19,6 +20,19 @@ class Employee {
     this.userId,
     this.notes,
   });
+
+  /// Lo que devuelve `/staff/employees`. La pantalla de administración lee de
+  /// la API y no del espejo: ahí se **escribe**, y quien acaba de guardar tiene
+  /// que ver la fila como quedó en el servidor y no como la dejó el último feed.
+  factory Employee.fromJson(Map<String, dynamic> json) => Employee(
+    id: json['id'] as String,
+    fullName: json['full_name'] as String,
+    isActive: json['is_active'] as bool,
+    version: json['version'] as int,
+    phone: json['phone'] as String?,
+    userId: json['user_id'] as String?,
+    notes: json['notes'] as String?,
+  );
 
   final String id;
   final String fullName;
@@ -52,6 +66,22 @@ class WorkShift {
     required this.sortOrder,
     required this.version,
   });
+
+  /// Lo que devuelve `/staff/shifts`.
+  ///
+  /// El servidor manda además `duration_minutes`, que aquí se ignora: se deriva
+  /// de la ventana con la misma cuenta, y guardar una copia solo daría dos
+  /// fuentes que pueden discrepar.
+  factory WorkShift.fromJson(Map<String, dynamic> json) => WorkShift(
+    id: json['id'] as String,
+    code: json['code'] as String,
+    name: json['name'] as String,
+    startsAt: ClockTime.parse(json['starts_at'] as String)!,
+    endsAt: ClockTime.parse(json['ends_at'] as String)!,
+    isActive: json['is_active'] as bool,
+    sortOrder: json['sort_order'] as int,
+    version: json['version'] as int,
+  );
 
   final String id;
   final String code;
@@ -91,6 +121,16 @@ class PayrollRate {
     required this.version,
     this.validTo,
   });
+
+  /// Lo que devuelve `/staff/rates`.
+  factory PayrollRate.fromJson(Map<String, dynamic> json) => PayrollRate(
+    id: json['id'] as String,
+    code: json['code'] as String,
+    amount: Fixed2.parse(json['amount'] as String) ?? 0,
+    validFrom: json['valid_from'] as String,
+    validTo: json['valid_to'] as String?,
+    version: json['version'] as int,
+  );
 
   /// La única de la fase 1.
   static const String overtimeCode = 'overtime_hour';

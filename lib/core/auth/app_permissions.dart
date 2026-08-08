@@ -65,4 +65,9 @@ abstract final class AppPermissions {
   // Administración de accesos.
   static const String usersManage = 'authorization.users.manage';
   static const String rolesManage = 'authorization.roles.manage';
+
+  /// Ver y revocar los dispositivos que sincronizan (§12). No lo tiene ningún
+  /// rol sembrado: llega por el comodín del administrador, igual que los tres
+  /// `authorization.*`.
+  static const String syncDevicesManage = 'sync.devices.manage';
 }

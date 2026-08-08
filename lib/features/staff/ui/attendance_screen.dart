@@ -1,6 +1,7 @@
 import 'package:design_system/design_system.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../core/auth/app_permissions.dart';
 import '../../../core/money/fixed2.dart';
@@ -16,6 +17,8 @@ import '../data/attendance_repository.dart';
 import '../domain/overtime.dart';
 import '../models/staff.dart';
 import '../state/attendance_controller.dart';
+import 'employees_screen.dart';
+import 'staff_settings_screen.dart';
 import 'widgets/clock_sheet.dart';
 import 'widgets/date_chip.dart';
 
@@ -92,6 +95,7 @@ class _Header extends ConsumerWidget {
                   ),
                 ),
               ),
+              const _AdminMenu(),
               DateChip(
                 date: date,
                 today: today,
@@ -541,6 +545,45 @@ class _Failed extends StatelessWidget {
 }
 
 /// Volver a «Más», de donde se llega a esta pantalla.
+/// La entrada a las dos pantallas de administración (§9.2 y §9.3).
+///
+/// Vive aquí y no en «Más» porque es donde se cae en cuenta de que hacen falta:
+/// alguien que no está en la lista, o una hora extra que no se puede valuar
+/// porque nadie ha dado de alta la tarifa.
+class _AdminMenu extends StatelessWidget {
+  const _AdminMenu();
+
+  @override
+  Widget build(BuildContext context) {
+    return PermissionGate(
+      anyOf: const [AppPermissions.staffManage],
+      child: PopupMenuButton<String>(
+        tooltip: 'Administrar',
+        icon: const Icon(Icons.more_vert_rounded, color: AppColors.white),
+        onSelected: (path) => context.push(path),
+        itemBuilder: (context) => const [
+          PopupMenuItem(
+            value: EmployeesScreen.path,
+            child: ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: Icon(Icons.groups_outlined),
+              title: Text('Empleados'),
+            ),
+          ),
+          PopupMenuItem(
+            value: StaffSettingsScreen.path,
+            child: ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: Icon(Icons.schedule_rounded),
+              title: Text('Turnos y tarifas'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _Back extends StatelessWidget {
   const _Back();
 

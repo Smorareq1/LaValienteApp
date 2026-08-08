@@ -39,6 +39,15 @@ dependencies:
   connectivity_plus: ^7.3.1
   sqlite3: ^2.9.4
 
+  # Cámara y galería para la foto del producto (§8.3). El recorte y la
+  # compresión los hace el propio plugin al pedirle un tamaño máximo, así que no
+  # entra una dependencia de imagen aparte.
+  image_picker: ^1.1.2
+
+  # El comprobante se comparte por el share sheet del sistema, que es por donde
+  # sale WhatsApp (§17.1). No entra impresora térmica en la fase 1.
+  share_plus: ^10.1.4
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

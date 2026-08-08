@@ -113,11 +113,12 @@ class _ClockInSheetState extends State<ClockInSheet> {
         children: [
           Text('HORA DE ENTRADA', style: AppTypography.label),
           const SizedBox(height: 7),
-          _TimeField(
-            value: _at,
+          AppTimeField(
+            hour: _at.hour,
+            minute: _at.minute,
             helpText: 'Hora de entrada',
-            onChanged: (picked) => setState(() {
-              _at = picked;
+            onChanged: (hour, minute) => setState(() {
+              _at = ClockTime(hour, minute);
               _shiftId = _suggestedShiftId();
             }),
           ),
@@ -269,11 +270,12 @@ class _ClockOutSheetState extends State<ClockOutSheet> {
         children: [
           Text('HORA DE SALIDA', style: AppTypography.label),
           const SizedBox(height: 7),
-          _TimeField(
-            value: _at,
+          AppTimeField(
+            hour: _at.hour,
+            minute: _at.minute,
             helpText: 'Hora de salida',
-            onChanged: (picked) => setState(() {
-              _at = picked;
+            onChanged: (hour, minute) => setState(() {
+              _at = ClockTime(hour, minute);
               // La sugerencia acompaña a la hora mientras nadie la haya
               // contradicho a mano.
               _minutes.text = '${_suggestion()}';
@@ -316,56 +318,6 @@ class _ClockOutSheetState extends State<ClockOutSheet> {
   }
 }
 
-/// Un campo de hora que abre el reloj del sistema.
-class _TimeField extends StatelessWidget {
-  const _TimeField({
-    required this.value,
-    required this.onChanged,
-    required this.helpText,
-  });
-
-  final ClockTime value;
-  final ValueChanged<ClockTime> onChanged;
-  final String helpText;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: AppColors.background,
-      borderRadius: AppRadius.mdAll,
-      child: InkWell(
-        borderRadius: AppRadius.mdAll,
-        onTap: () async {
-          final picked = await showTimePicker(
-            context: context,
-            initialTime: TimeOfDay(hour: value.hour, minute: value.minute),
-            helpText: helpText,
-            cancelText: 'Cancelar',
-            confirmText: 'Listo',
-          );
-          if (picked != null) onChanged(ClockTime(picked.hour, picked.minute));
-        },
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-          child: Row(
-            children: [
-              const Icon(
-                Icons.schedule_rounded,
-                size: 18,
-                color: AppColors.textSecondary,
-              ),
-              const SizedBox(width: 10),
-              Text(
-                value.label,
-                style: AppTypography.body.copyWith(fontWeight: FontWeight.w700),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
 
 /// Cuánto lleva trabajado, contra el turno si lo hay.
 class _WorkedSummary extends StatelessWidget {

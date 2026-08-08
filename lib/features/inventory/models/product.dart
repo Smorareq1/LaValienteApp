@@ -1,4 +1,5 @@
 import '../../../core/database/tables/synced_columns.dart';
+import '../../../core/money/fixed2.dart';
 import '../../../core/money/payment_method.dart';
 import '../domain/supply_sale_pricing.dart';
 
@@ -58,6 +59,22 @@ class ProductSummary {
     this.nextSalePrice,
   });
 
+  /// Lo que devuelven los endpoints de producto. Las pantallas de lectura arman
+  /// esto desde el espejo local; las de administración lo arman de la respuesta,
+  /// porque quien acaba de guardar tiene que ver la fila como quedó arriba.
+  factory ProductSummary.fromJson(Map<String, dynamic> json) => ProductSummary(
+    id: json['id'] as String,
+    name: json['name'] as String,
+    unit: json['unit'] as String,
+    isActive: json['is_active'] as bool,
+    stock: Fixed2.parse(json['stock'] as String?) ?? 0,
+    sellableStock: Fixed2.parse(json['sellable_stock'] as String?) ?? 0,
+    version: json['version'] as int,
+    imagePath: json['image_path'] as String?,
+    description: json['description'] as String?,
+    nextSalePrice: Fixed2.parse(json['next_sale_price'] as String?),
+  );
+
   final String id;
   final String name;
   final String unit;
@@ -94,6 +111,19 @@ class ProductLot {
     required this.version,
     this.salePrice,
   });
+
+  /// Lo que devuelve `/inventory/products/{id}/lots`. `unit_cost` viene en esta
+  /// respuesta pero no en el feed: el margen de compra se administra, no se lee
+  /// en el mostrador.
+  factory ProductLot.fromJson(Map<String, dynamic> json) => ProductLot(
+    id: json['id'] as String,
+    lotNumber: json['lot_number'] as int,
+    quantityReceived: Fixed2.parse(json['quantity_received'] as String?) ?? 0,
+    quantityAvailable: Fixed2.parse(json['quantity_available'] as String?) ?? 0,
+    receivedAt: json['received_at'] as String,
+    version: json['version'] as int,
+    salePrice: Fixed2.parse(json['sale_price'] as String?),
+  );
 
   final String id;
   final int lotNumber;

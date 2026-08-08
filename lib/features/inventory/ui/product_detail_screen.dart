@@ -2,10 +2,15 @@ import 'package:design_system/design_system.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/auth/app_permissions.dart';
 import '../../../core/money/fixed2.dart';
 import '../../../core/time/business_date.dart';
+import '../../auth/state/auth_controller.dart';
 import '../models/product.dart';
 import '../state/shelf_controller.dart';
+import 'widgets/lot_form_sheet.dart';
+import 'widgets/movement_form_sheet.dart';
+import 'widgets/product_form_sheet.dart';
 import 'widgets/product_image.dart';
 
 /// Detalle de un producto (Plan 0006 §8.2).
@@ -33,10 +38,21 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
   Widget build(BuildContext context) {
     final detail = ref.watch(productDetailProvider(widget.productId));
 
+    final canManage =
+        ref
+            .watch(authControllerProvider)
+            .valueOrNull
+            ?.hasPermission(AppPermissions.inventoryManage) ??
+        false;
+
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
         title: Text(detail.valueOrNull?.product.name ?? 'Producto'),
+        actions: [
+          if (canManage && detail.valueOrNull != null)
+            _AdminMenu(detail: detail.valueOrNull!),
+        ],
       ),
       body: switch (detail) {
         AsyncError(:final error) => _Failed(error: '$error'),
@@ -48,6 +64,77 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
         ),
         _ => const Center(child: CircularProgressIndicator()),
       },
+    );
+  }
+}
+
+/// Las tres escrituras del producto (§8.3, §8.4 y §8.5).
+///
+/// Van aquí y no en la cuadrícula porque las tres necesitan el producto abierto:
+/// un lote entra a un producto, y un movimiento sale de un lote suyo.
+class _AdminMenu extends StatelessWidget {
+  const _AdminMenu({required this.detail});
+
+  final ProductDetail detail;
+
+  /// Un movimiento sale de un lote con existencia; los agotados no se ofrecen.
+  List<ProductLot> get _liveLots => [
+    for (final lot in detail.lots)
+      if (!lot.isEmpty) lot,
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    return PopupMenuButton<String>(
+      tooltip: 'Administrar',
+      icon: const Icon(Icons.more_vert_rounded),
+      onSelected: (action) async {
+        switch (action) {
+          case 'edit':
+            await ProductFormSheet.show(context, product: detail.product);
+          case 'lot':
+            final lot = await LotFormSheet.show(context, product: detail.product);
+            if (lot != null && context.mounted) {
+              // El número lo puso el sistema (D3), así que hay que decirlo:
+              // nadie lo eligió y es por donde se le va a llamar de aquí en más.
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('Entró como lote ${lot.lotNumber}.')),
+              );
+            }
+          case 'movement':
+            await MovementFormSheet.show(
+              context,
+              product: detail.product,
+              lots: _liveLots,
+            );
+        }
+      },
+      itemBuilder: (context) => const [
+        PopupMenuItem(
+          value: 'lot',
+          child: ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: Icon(Icons.local_shipping_outlined),
+            title: Text('Registrar una compra'),
+          ),
+        ),
+        PopupMenuItem(
+          value: 'movement',
+          child: ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: Icon(Icons.tune_rounded),
+            title: Text('Uso interno o ajuste'),
+          ),
+        ),
+        PopupMenuItem(
+          value: 'edit',
+          child: ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: Icon(Icons.edit_outlined),
+            title: Text('Editar el producto'),
+          ),
+        ),
+      ],
     );
   }
 }

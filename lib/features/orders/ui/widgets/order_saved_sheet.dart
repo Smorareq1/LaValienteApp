@@ -1,6 +1,9 @@
 import 'package:design_system/design_system.dart';
 import 'package:flutter/material.dart';
+import 'package:share_plus/share_plus.dart';
 
+import '../../../../core/receipts/receipt.dart';
+import '../../../../core/time/business_date.dart';
 import '../../models/saved_order.dart';
 
 /// Confirmación de una boleta guardada (plan 0002 §3.8).
@@ -22,6 +25,27 @@ class OrderSavedSheet extends StatelessWidget {
     );
   }
 
+  /// Arma el comprobante y lo entrega al share sheet del sistema (§17.1), que
+  /// es por donde sale WhatsApp. La sheet no se cierra: compartir es una cosa
+  /// que se hace **además** de seguir, no en lugar de.
+  Future<void> _share(BuildContext context) async {
+    final box = context.findRenderObject() as RenderBox?;
+    await Share.share(
+      orderReceipt(
+        reference: order.reference,
+        total: order.total,
+        paid: order.paid,
+        date: formatBusinessDate(businessDate()),
+        pendingSync: order.pendingSync,
+      ),
+      // iPad ancla el menú a un rectángulo; sin esto revienta ahí y en ningún
+      // otro sitio.
+      sharePositionOrigin: box == null
+          ? null
+          : box.localToGlobal(Offset.zero) & box.size,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return AppBottomSheetScaffold(
@@ -29,26 +53,41 @@ class OrderSavedSheet extends StatelessWidget {
       subtitle: order.pendingSync
           ? 'Queda pendiente de sincronizar'
           : 'Ya está registrado en el sistema',
-      actions: Row(
+      actions: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Expanded(
-            child: AppButton(
-              label: 'Listo',
-              variant: AppButtonVariant.outline,
-              fullWidth: true,
-              onPressed: () => Navigator.of(context).pop(false),
-            ),
+          // Compartir va arriba y ocupa el ancho porque es lo que se hace
+          // **con el cliente delante**, antes de decidir si viene otra boleta.
+          AppButton(
+            label: 'Compartir comprobante',
+            variant: AppButtonVariant.secondary,
+            icon: const Icon(Icons.ios_share_rounded, size: 17),
+            fullWidth: true,
+            onPressed: () => _share(context),
           ),
-          const SizedBox(width: 9),
-          Expanded(
-            flex: 2,
-            child: AppButton(
-              label: 'Nuevo pedido',
-              icon: const Icon(Icons.add_rounded),
-              fullWidth: true,
-              elevated: true,
-              onPressed: () => Navigator.of(context).pop(true),
-            ),
+          const SizedBox(height: 9),
+          Row(
+            children: [
+              Expanded(
+                child: AppButton(
+                  label: 'Listo',
+                  variant: AppButtonVariant.outline,
+                  fullWidth: true,
+                  onPressed: () => Navigator.of(context).pop(false),
+                ),
+              ),
+              const SizedBox(width: 9),
+              Expanded(
+                flex: 2,
+                child: AppButton(
+                  label: 'Nuevo pedido',
+                  icon: const Icon(Icons.add_rounded),
+                  fullWidth: true,
+                  elevated: true,
+                  onPressed: () => Navigator.of(context).pop(true),
+                ),
+              ),
+            ],
           ),
         ],
       ),

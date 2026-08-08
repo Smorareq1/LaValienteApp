@@ -24,6 +24,12 @@
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<!-- La foto del producto (plan 0006 §8.3). iOS muestra estos textos al pedir
+	     el permiso, así que dicen para qué y no "la app necesita acceso". -->
+	<key>NSCameraUsageDescription</key>
+	<string>Para tomarle la foto a un producto del inventario.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Para elegir de tus fotos la de un producto del inventario.</string>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIMainStoryboardFile</key>

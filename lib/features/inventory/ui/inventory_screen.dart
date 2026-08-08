@@ -9,6 +9,7 @@ import '../../auth/state/auth_controller.dart';
 import '../../shell/ui/widgets/gradient_header.dart';
 import '../models/product.dart';
 import '../state/shelf_controller.dart';
+import 'widgets/product_form_sheet.dart';
 import 'widgets/product_image.dart';
 
 /// Insumos (Plan 0006 §8.1).
@@ -55,6 +56,17 @@ class InventoryScreen extends ConsumerWidget {
           ),
         ],
       ),
+      // Dar de alta un producto es administración en línea (plan 0005 D11), así
+      // que el botón solo existe para quien puede hacerlo.
+      floatingActionButton: canManage
+          ? FloatingActionButton.extended(
+              onPressed: () => ProductFormSheet.show(context),
+              backgroundColor: AppColors.primary500,
+              foregroundColor: AppColors.white,
+              icon: const Icon(Icons.add_rounded),
+              label: const Text('Producto'),
+            )
+          : null,
     );
   }
 

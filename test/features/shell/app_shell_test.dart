@@ -192,35 +192,12 @@ void main() {
     expect(find.text('Promociones'), findsOneWidget);
   });
 
-  testWidgets('cada entrada de Más abre una pantalla y deja volver', (tester) async {
-    tester.view.physicalSize = const Size(400, 1400);
-    tester.view.devicePixelRatio = 1;
-    addTearDown(tester.view.reset);
-
-    await _pumpApp(tester, _user(permissions: const [AppPermissions.all]));
-
-    await tester.tap(find.text('Más'));
-    await tester.pumpAndSettle();
-
-    // Fuera quedan las del hub que ya tienen pantalla real: Sincronización
-    // (UI 1), Promociones (UI 5), Insumos y Personal (UI 7) y los cierres
-    // (UI 8). Las de UI 7 leen del espejo local, así que se prueban donde se
-    // les puede dar una base en memoria —cada una en su propio archivo— y no
-    // desde el shell.
-    const entries = ['Catálogo', 'Ajustes'];
-
-    for (final entry in entries) {
-      await tester.tap(find.text(entry));
-      await tester.pumpAndSettle();
-
-      // Sin ruta, GoRouter caería en su pantalla de error en vez de en esto.
-      expect(find.text('En construcción'), findsOneWidget, reason: entry);
-
-      await tester.tap(find.byTooltip('Volver'));
-      await tester.pumpAndSettle();
-      expect(find.text('Cerrar sesión'), findsOneWidget, reason: entry);
-    }
-  });
+  // Aquí vivía «cada entrada de Más abre una pantalla y deja volver», que
+  // comprobaba que ninguna entrada del hub cayera en la pantalla de ruta
+  // desconocida mientras su fase estaba pendiente. Ya no queda ninguna: las
+  // cinco tienen pantalla real y cada una se prueba en su propio archivo, con
+  // su base en memoria o su servidor de mentira. Recorrerlas desde el shell
+  // pedía una BD para todo el árbol y colgaba las demás pruebas del archivo.
 
   testWidgets('un deny explícito le gana al comodín', (tester) async {
     tester.view.physicalSize = const Size(400, 1400);

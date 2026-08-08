@@ -2,8 +2,10 @@ import 'package:design_system/design_system.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../../../core/money/fixed2.dart';
+import '../../../core/receipts/receipt.dart';
 import '../../../core/money/payment_method.dart';
 import '../../../core/time/business_date.dart';
 import '../../auth/state/auth_controller.dart';
@@ -91,11 +93,31 @@ class _SupplySaleScreenState extends ConsumerState<SupplySaleScreen> {
         ..clearSnackBars()
         ..showSnackBar(SnackBar(content: Text(failure.message))),
       (sale) {
+        // El comprobante se arma **antes** de salir: las líneas con su precio
+        // están aquí y no en la venta guardada, que solo lleva el total.
+        final receipt = supplySaleReceipt(
+          total: sale.total,
+          date: formatBusinessDate(ref.read(cashDateFilterProvider)),
+          customerName: _customer?.fullName,
+          method: _method.label,
+          items: [
+            for (final line in lines)
+              (
+                name: line.productName,
+                quantity: line.quantity,
+                amount: line.amount,
+              ),
+          ],
+        );
         ScaffoldMessenger.of(context)
           ..clearSnackBars()
           ..showSnackBar(
             SnackBar(
               content: Text('Venta registrada por Q${Fixed2.format(sale.total)}'),
+              action: SnackBarAction(
+                label: 'Compartir',
+                onPressed: () => Share.share(receipt),
+              ),
             ),
           );
         context.pop();
