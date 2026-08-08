@@ -69,10 +69,18 @@ class OrderMirror extends TableMirror<OrderEntry> {
   /// filas en la BD local. Sin esta cascada las hijas se quedarían `pending`
   /// para siempre: el motor solo conoce la entidad que nombra la operación, y el
   /// pull nunca podría traerles los montos que el servidor recalculó.
+  ///
+  /// Si además se aceptó, las líneas que capturó el dispositivo se retiran: ver
+  /// [_retireCapturedLines].
   @override
   Future<void> settle(String entityId, {required bool rejected}) async {
     await super.settle(entityId, rejected: rejected);
     final status = rejected ? RowSyncStatus.rejected : RowSyncStatus.synced;
+
+    // Antes de marcar nada. El retiro se apoya en `sync_status` para saber qué
+    // filas capturó el mostrador, y la cascada de abajo borra justamente esa
+    // señal.
+    if (!rejected) await _retireCapturedLines(entityId);
 
     for (final child in <TableInfo<Table, DataClass>>[
       database.orderGarmentEntries,
@@ -95,6 +103,54 @@ class OrderMirror extends TableMirror<OrderEntry> {
       variables: [Variable<String>(status.name), Variable<String>(entityId)],
       updates: {database.orderPaymentEntries},
     );
+  }
+
+  /// Retira las líneas que minteó el dispositivo: el servidor creó las suyas.
+  ///
+  /// `order/create` y `order/update` mandan cantidades y elecciones, nunca ids
+  /// de línea (ver `OrdersRepository.buildCreatePayload`): prendas, cargos y
+  /// descuentos los arma el servidor con ids propios. Cuando el feed los baja,
+  /// el `insertOrReplace` de [TableMirror.apply] no encuentra a quién pisar e
+  /// inserta filas **nuevas**, y la boleta queda con cada línea dos veces: la
+  /// vista previa y la de verdad. Es el mismo retiro que hace
+  /// `SupplySaleMirror.settle` con las líneas de una venta de insumo.
+  ///
+  /// Dos condiciones, y las dos hacen falta:
+  ///
+  /// - `pending` — es lo que se capturó aquí. Lo que ya trajo el feed está
+  ///   `synced` y esta lápida no lo toca.
+  /// - `version = 0` — la fila nunca vino del servidor. Sin esto, entregar un
+  ///   pedido se llevaría por delante las líneas buenas: `markDelivered` marca
+  ///   las prendas `pending` para escribirles el conteo, y `order/deliver` se
+  ///   resuelve por esta misma entidad.
+  ///
+  /// Rechazada es distinto y por eso no se llama: la boleta no existe del otro
+  /// lado, no va a bajar nada, y las líneas son lo único que dice qué se había
+  /// capturado. Se quedan hasta que alguien decida en la cola de revisión.
+  ///
+  /// El anticipo queda fuera a propósito: ese sí viaja con el id que le puso el
+  /// dispositivo, así que el feed lo encuentra y lo actualiza en su lugar.
+  Future<void> _retireCapturedLines(String orderId) async {
+    final now = DateTime.now();
+
+    for (final child in <TableInfo<Table, DataClass>>[
+      database.orderGarmentEntries,
+      database.orderChargeEntries,
+      database.orderDiscountEntries,
+    ]) {
+      await database.customUpdate(
+        'UPDATE ${child.actualTableName} SET deleted_at = ?, sync_status = ? '
+        'WHERE order_id = ? AND sync_status = ? AND version = 0 '
+        'AND deleted_at IS NULL',
+        variables: [
+          Variable<DateTime>(now),
+          Variable<String>(RowSyncStatus.synced.name),
+          Variable<String>(orderId),
+          Variable<String>(RowSyncStatus.pending.name),
+        ],
+        updates: {child},
+      );
+    }
   }
 
   /// Descartar la boleta se lleva sus líneas y su anticipo.

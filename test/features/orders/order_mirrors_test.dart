@@ -4,6 +4,9 @@ import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:la_valiente/core/database/app_database.dart';
 import 'package:la_valiente/features/orders/data/order_mirrors.dart';
+import 'package:la_valiente/features/orders/data/orders_local_datasource.dart';
+import 'package:la_valiente/features/orders/domain/order_capture.dart';
+import 'package:la_valiente/features/orders/domain/order_pricing.dart';
 import 'package:la_valiente/features/sync/models/sync_change.dart';
 
 SyncChange _change(String entity, String id, Map<String, Object?> data, {int version = 1}) {
@@ -48,6 +51,59 @@ SyncChange _order(
       'cancel_reason': cancelReason,
     },
     version: version,
+  );
+}
+
+/// La prenda que el servidor creó a partir de la captura: la misma camisa, con
+/// el id que minteó él.
+SyncChange _serverGarment(String id, {int? delivered}) {
+  return _change('order_garment', id, {
+    'order_id': 'o1',
+    'garment_type_id': 'gt1',
+    'quantity': 8,
+    'quantity_delivered': delivered,
+    'notes': null,
+  });
+}
+
+/// Una boleta capturada en el dispositivo: prenda, cargo y descuento, los tres
+/// con ids del teléfono, y el anticipo si se dio.
+Future<void> _capture(OrdersLocalDataSource local, {PaymentDraft? advance}) {
+  return local.insertCapture(
+    orderId: 'o1',
+    capture: OrderCapture(
+      orderDate: '2026-07-20',
+      customerId: 'c1',
+      garments: const [GarmentDraft(garmentTypeId: 'gt1', quantity: 8)],
+      charges: const [ChargeDraft(serviceCode: 'wash_tub', optionCode: 'G')],
+      discounts: const [ManualDiscount(description: 'Cortesía', amount: 750)],
+      advancePayment: advance,
+    ),
+    priced: const PricedOrder(
+      charges: [
+        PricedCharge(
+          serviceCode: 'wash_tub',
+          optionCode: 'G',
+          serviceTypeId: 's1',
+          serviceOptionId: 'op1',
+          description: 'Lavado por tina — Tina grande',
+          quantity: 100,
+          unitPrice: 3000,
+          amount: 3000,
+        ),
+      ],
+      discounts: [PricedDiscount(description: 'Cortesía', amount: 750)],
+      subtotal: 3000,
+      discountTotal: 750,
+      total: 2250,
+    ),
+    dailyNumber: -1,
+    receivedById: 'u1',
+    capturedAt: DateTime.utc(2026, 7, 20, 15),
+    garmentIds: const ['local-g'],
+    chargeIds: const ['local-ch'],
+    discountIds: const ['local-d'],
+    paymentId: advance == null ? null : 'local-p',
   );
 }
 
@@ -190,5 +246,97 @@ void main() {
     )..where((entry) => entry.id.equals('d1'))).getSingle();
     expect(row.promotionId, isNull);
     expect(row.amount, '7.50');
+  });
+
+  group('una boleta aceptada suelta las líneas que capturó', () {
+    late OrdersLocalDataSource local;
+
+    setUp(() => local = OrdersLocalDataSource(database));
+
+    test('la prenda del servidor no se suma a la que se capturó', () async {
+      await _capture(local);
+      await OrderMirror(database).settle('o1', rejected: false);
+      await OrderGarmentMirror(database).apply(_serverGarment('srv-g'));
+
+      // Ocho camisas capturadas y ocho camisas que bajaron son la misma línea
+      // con dos ids: el pedido lleva una prenda, no dos.
+      final detail = await local.detail('o1');
+      expect(detail!.garments.map((line) => line.id), ['srv-g']);
+    });
+
+    test('el cargo y el descuento tampoco', () async {
+      await _capture(local);
+      await OrderMirror(database).settle('o1', rejected: false);
+      await OrderChargeMirror(database).apply(
+        _change('order_charge', 'srv-ch', {
+          'order_id': 'o1',
+          'service_type_id': 's1',
+          'service_option_id': 'op1',
+          'description': 'Lavado por tina — Tina grande',
+          'quantity': '1.00',
+          'unit_price': '30.00',
+          'amount': '30.00',
+        }),
+      );
+      await OrderDiscountMirror(database).apply(
+        _change('order_discount', 'srv-d', {
+          'order_id': 'o1',
+          'promotion_id': null,
+          'description': 'Cortesía',
+          'amount': '7.50',
+        }),
+      );
+
+      // Y con eso el detalle vuelve a cuadrar contra el total: dos cargos de
+      // Q30 en una boleta de Q22.50 es lo que el cliente ve al reclamar.
+      final detail = await local.detail('o1');
+      expect(detail!.charges.map((line) => line.id), ['srv-ch']);
+      expect(detail.discounts.map((line) => line.id), ['srv-d']);
+    });
+
+    test('el anticipo se queda: ese sí lleva el id del dispositivo', () async {
+      await _capture(local, advance: const PaymentDraft(amount: 1000));
+      await OrderMirror(database).settle('o1', rejected: false);
+
+      // Retirarlo dejaría el pedido debiendo dinero que ya está en la caja, y
+      // el feed lo va a encontrar por su id para actualizarlo en su lugar.
+      final detail = await local.detail('o1');
+      expect(detail!.payments.map((line) => line.id), ['local-p']);
+      expect(detail.paid, 1000);
+    });
+
+    test('rechazada las conserva: son lo único que dice qué se capturó', () async {
+      await _capture(local);
+      await OrderMirror(database).settle('o1', rejected: true);
+
+      // Del otro lado la boleta no existe, así que no va a bajar nada que las
+      // reemplace. Se quedan hasta que alguien decida en la cola de revisión.
+      final detail = await local.detail('o1');
+      expect(detail!.garments.map((line) => line.id), ['local-g']);
+      expect(detail.charges.map((line) => line.id), ['local-ch']);
+      expect(detail.discounts.map((line) => line.id), ['local-d']);
+    });
+
+    test('entregar no se lleva las prendas que trajo el feed', () async {
+      final mirror = OrderMirror(database);
+      await _capture(local);
+      await mirror.settle('o1', rejected: false);
+      await OrderGarmentMirror(database).apply(_serverGarment('srv-g'));
+
+      // El conteo de la entrega se escribe sobre la prenda del servidor y la
+      // deja `pending` hasta que suba. `order/deliver` se resuelve por esta
+      // misma entidad, y retirar por `pending` a secas la borraría.
+      await local.markDelivered(
+        id: 'o1',
+        delivered: {'srv-g': 7},
+        deliveredById: 'u1',
+        at: DateTime.utc(2026, 7, 21, 16),
+      );
+      await mirror.settle('o1', rejected: false);
+
+      final detail = await local.detail('o1');
+      expect(detail!.garments.single.id, 'srv-g');
+      expect(detail.garments.single.quantityDelivered, 7);
+    });
   });
 }
