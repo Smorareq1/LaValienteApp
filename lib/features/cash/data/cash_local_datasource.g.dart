@@ -1,33 +1,28 @@
 // GENERATED CODE - DO NOT MODIFY BY HAND
 
-part of 'app_router.dart';
+part of 'cash_local_datasource.dart';
 
 // **************************************************************************
 // RiverpodGenerator
 // **************************************************************************
 
-String _$appRouterHash() => r'45aed7e88c98db625cfcafe6ac76bb9c7b117a03';
+String _$cashLocalDataSourceHash() =>
+    r'a4fa64e721caa75d9a194e150edf307d4ca798f7';
 
-/// Router de la app con auth guard reactivo:
-/// - Mientras se restaura la sesión → splash.
-/// - Sin sesión → cualquier ruta protegida redirige a login.
-/// - Con sesión → login/splash redirigen a Inicio.
-/// - Con sesión pero sin el permiso de la ruta → vuelve a Inicio.
-///
-/// Copied from [appRouter].
-@ProviderFor(appRouter)
-final appRouterProvider = Provider<GoRouter>.internal(
-  appRouter,
-  name: r'appRouterProvider',
+/// See also [cashLocalDataSource].
+@ProviderFor(cashLocalDataSource)
+final cashLocalDataSourceProvider = Provider<CashLocalDataSource>.internal(
+  cashLocalDataSource,
+  name: r'cashLocalDataSourceProvider',
   debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
       ? null
-      : _$appRouterHash,
+      : _$cashLocalDataSourceHash,
   dependencies: null,
   allTransitiveDependencies: null,
 );
 
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
-typedef AppRouterRef = ProviderRef<GoRouter>;
+typedef CashLocalDataSourceRef = ProviderRef<CashLocalDataSource>;
 // ignore_for_file: type=lint
 // ignore_for_file: subtype_of_sealed_class, invalid_use_of_internal_member, invalid_use_of_visible_for_testing_member, deprecated_member_use_from_same_package

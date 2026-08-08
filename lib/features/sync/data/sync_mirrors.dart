@@ -2,8 +2,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../core/database/app_database.dart';
+import '../../cash/data/cash_mirrors.dart';
 import '../../catalog/data/catalog_mirrors.dart';
 import '../../customers/data/customer_mirror.dart';
+import '../../inventory/data/inventory_mirrors.dart';
 import '../../orders/data/order_mirrors.dart';
 import '../../promotions/data/promotion_mirror.dart';
 import 'entity_mirror.dart';
@@ -27,6 +29,8 @@ Map<String, SyncEntityMirror> syncMirrors(Ref ref) {
     CustomerMirror(database),
     ...orderMirrors(database),
     PromotionMirror(database),
+    ...cashMirrors(database),
+    ...inventoryMirrors(database),
   ];
   return {for (final mirror in mirrors) mirror.entity: mirror};
 }

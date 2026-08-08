@@ -41,6 +41,18 @@ abstract final class Fixed2 {
     return '$sign${absolute ~/ 100}.${cents.toString().padLeft(2, '0')}';
   }
 
+  /// 300 → `"3"`, 350 → `"3.5"`, 325 → `"3.25"`.
+  ///
+  /// Solo para **cantidades**, nunca para dinero: los centavos se escriben
+  /// siempre, porque "Q7.5" en una boleta se lee como un descuido. Tres botes
+  /// de jabón, en cambio, son tres y no "3.00".
+  static String formatQuantity(int value) {
+    final text = format(value);
+    if (text.endsWith('.00')) return text.substring(0, text.length - 3);
+    if (text.endsWith('0')) return text.substring(0, text.length - 1);
+    return text;
+  }
+
   /// Para pintarlo con `AppMoneyText`, que trabaja en `double`.
   ///
   /// La conversión se hace al final y solo para dibujar: mientras el número

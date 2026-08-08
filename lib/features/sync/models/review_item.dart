@@ -45,6 +45,9 @@ enum ReviewKind {
   customerCreate,
   customerUpdate,
   customerArchive,
+  expenseCreate,
+  expenseUpdate,
+  supplySaleCreate,
   unknown;
 
   static ReviewKind fromOperation(String entity, String opType) =>
@@ -58,6 +61,12 @@ enum ReviewKind {
         ('customer', 'create') => ReviewKind.customerCreate,
         ('customer', 'update') => ReviewKind.customerUpdate,
         ('customer', 'archive') => ReviewKind.customerArchive,
+        ('expense', 'create') => ReviewKind.expenseCreate,
+        ('expense', 'update') => ReviewKind.expenseUpdate,
+        // Anular una venta no aparece: el §7 le da `supply_sales.cancel` solo al
+        // admin y el mostrador no lo captura, así que ninguna operación de esa
+        // forma sale de esta app.
+        ('supply_sale', 'create') => ReviewKind.supplySaleCreate,
         _ => ReviewKind.unknown,
       };
 
@@ -72,6 +81,9 @@ enum ReviewKind {
     ReviewKind.customerCreate => 'Cliente nuevo',
     ReviewKind.customerUpdate => 'Datos de un cliente',
     ReviewKind.customerArchive => 'Archivar un cliente',
+    ReviewKind.expenseCreate => 'Gasto nuevo',
+    ReviewKind.expenseUpdate => 'Corrección de un gasto',
+    ReviewKind.supplySaleCreate => 'Venta de insumo',
     ReviewKind.unknown => 'Operación',
   };
 
@@ -84,7 +96,9 @@ enum ReviewKind {
   bool get createsLocalRow =>
       this == ReviewKind.orderCreate ||
       this == ReviewKind.paymentCreate ||
-      this == ReviewKind.customerCreate;
+      this == ReviewKind.customerCreate ||
+      this == ReviewKind.expenseCreate ||
+      this == ReviewKind.supplySaleCreate;
 }
 
 /// Una captura que el servidor no aceptó y espera una decisión humana
@@ -165,6 +179,13 @@ class ReviewItem {
     ReviewKind.customerCreate ||
     ReviewKind.customerUpdate => (localPayload['full_name'] as String?) ?? '—',
     ReviewKind.customerArchive => 'Sacarlo de la lista',
+    ReviewKind.expenseCreate ||
+    ReviewKind.expenseUpdate => (localPayload['concept'] as String?) ?? '—',
+    // Cuántas líneas y no cuánto: el total que se capturó es una vista previa,
+    // y el servidor lo recalcula contra los lotes del momento (D10). Poner una
+    // cifra aquí sería afirmar un monto que quizá nunca fue.
+    ReviewKind.supplySaleCreate =>
+      '${_count(localPayload['lines'])} ${_count(localPayload['lines']) == 1 ? 'producto' : 'productos'}',
     ReviewKind.unknown => '$entity · $opType',
   };
 
@@ -207,6 +228,24 @@ class ReviewItem {
       if (localPayload['nit'] != null) ReviewFact('NIT', localPayload['nit'] as String),
     ],
     ReviewKind.customerArchive => const [],
+    ReviewKind.expenseCreate || ReviewKind.expenseUpdate => [
+      ReviewFact('Concepto', (localPayload['concept'] as String?) ?? '—'),
+      ReviewFact('Monto', 'Q${localPayload['amount'] ?? '0.00'}'),
+      ReviewFact('Método', _methodLabel(localPayload['method'])),
+      ReviewFact(
+        'Estado',
+        localPayload['status'] == 'pending' ? 'Queda pendiente de pago' : 'Pagado',
+      ),
+      if (localPayload['expense_date'] != null)
+        ReviewFact('Fecha', localPayload['expense_date'] as String),
+    ],
+    ReviewKind.supplySaleCreate => [
+      ReviewFact('Productos', '${_count(localPayload['lines'])}'),
+      ReviewFact('Método', _methodLabel(localPayload['method'])),
+      if (localPayload['sale_date'] != null)
+        ReviewFact('Fecha', localPayload['sale_date'] as String),
+      if (localPayload['nit'] != null) ReviewFact('NIT', localPayload['nit'] as String),
+    ],
     ReviewKind.unknown => const [],
   };
 

@@ -8,5 +8,7 @@ String syncEntityLabel(String entity, {required int count}) => switch (entity) {
   'order' => count == 1 ? 'Pedido' : 'Pedidos',
   'order_payment' => count == 1 ? 'Cobro' : 'Cobros',
   'customer' => count == 1 ? 'Cliente' : 'Clientes',
+  'expense' => count == 1 ? 'Gasto' : 'Gastos',
+  'supply_sale' => count == 1 ? 'Venta de insumo' : 'Ventas de insumo',
   _ => entity,
 };

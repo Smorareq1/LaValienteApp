@@ -2,20 +2,25 @@ import 'package:design_system/design_system.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../auth/ui/widgets/permission_gate.dart';
 import '../../../../core/auth/app_permissions.dart';
-import '../../../customers/data/customers_repository.dart';
-import '../../../customers/models/customer.dart';
-import '../../../customers/ui/widgets/customer_form_sheet.dart';
-import '../../../customers/ui/widgets/customer_initials.dart';
+import '../../../auth/ui/widgets/permission_gate.dart';
+import '../../data/customers_repository.dart';
+import '../../models/customer.dart';
+import 'customer_form_sheet.dart';
+import 'customer_initials.dart';
 
-/// Sección [2] de la boleta: quién trae la ropa (plan 0002 §3.2).
+/// Elegir a quién pertenece algo: la sección [2] de la boleta (plan 0002 §3.2) y
+/// el cliente opcional de una venta de insumo (plan 0006 §7.3).
+///
+/// Vive en `customers` y no en el módulo que lo usa porque solo sabe de
+/// clientes: la toma de pedido lo estrenó, la venta de mostrador lo reusa, y
+/// ninguna de las dos tiene por qué depender de la otra.
 ///
 /// Busca contra la BD local, igual que la pantalla de Clientes: el mostrador
 /// tiene que poder encontrar a alguien sin señal, y quien acaba de darse de alta
 /// hace diez segundos aparece aquí aunque el servidor todavía no lo sepa.
-class CustomerSection extends ConsumerStatefulWidget {
-  const CustomerSection({
+class CustomerPicker extends ConsumerStatefulWidget {
+  const CustomerPicker({
     super.key,
     required this.customer,
     required this.onChanged,
@@ -25,10 +30,10 @@ class CustomerSection extends ConsumerStatefulWidget {
   final ValueChanged<Customer?> onChanged;
 
   @override
-  ConsumerState<CustomerSection> createState() => _CustomerSectionState();
+  ConsumerState<CustomerPicker> createState() => _CustomerPickerState();
 }
 
-class _CustomerSectionState extends ConsumerState<CustomerSection> {
+class _CustomerPickerState extends ConsumerState<CustomerPicker> {
   String _query = '';
 
   Future<void> _createCustomer() async {

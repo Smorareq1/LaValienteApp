@@ -9,6 +9,8 @@ import '../../features/auth/ui/forgot_password_screen.dart';
 import '../../features/auth/ui/login_screen.dart';
 import '../../features/auth/ui/reset_password_screen.dart';
 import '../../features/auth/ui/splash_screen.dart';
+import '../../features/cash/ui/cash_screen.dart';
+import '../../features/cash/ui/supply_sale_screen.dart';
 import '../../features/customers/ui/customer_detail_screen.dart';
 import '../../features/customers/ui/customers_screen.dart';
 import '../../features/home/ui/home_screen.dart';
@@ -42,6 +44,8 @@ const Map<String, List<String>> _routePermissions = {
   OrderCaptureScreen.path: [AppPermissions.ordersCreate],
   '/customers': [AppPermissions.customersRead],
   '/cash': [AppPermissions.expensesRead],
+  // Se evalúa además del de `/cash`: vender un insumo supone poder ver la caja.
+  SupplySaleScreen.path: [AppPermissions.supplySalesCreate],
   '/cash/history': [AppPermissions.dailyCloseRead],
   '/inventory': [AppPermissions.inventoryRead],
   '/staff': [AppPermissions.attendanceRecord, AppPermissions.staffRead],
@@ -178,6 +182,14 @@ GoRouter appRouter(Ref ref) {
         builder: (context, state) =>
             OrderCaptureScreen(orderId: state.pathParameters['id']),
       ),
+      // La venta de insumo va fuera del shell por lo mismo que la toma de
+      // pedido: su footer con el TOTAL ocupa el sitio de la barra de cinco
+      // destinos. Y **antes** del shell, porque dentro de la rama de Caja
+      // podrían vivir rutas hijas que también casarían con "supply-sale".
+      GoRoute(
+        path: SupplySaleScreen.path,
+        builder: (context, state) => const SupplySaleScreen(),
+      ),
       // Administrar promociones también se apila sobre el shell: se llega desde
       // "Más", es cosa de admin y no uno de los cinco destinos del mostrador.
       GoRoute(
@@ -231,12 +243,8 @@ GoRouter appRouter(Ref ref) {
           StatefulShellBranch(
             routes: [
               GoRoute(
-                path: '/cash',
-                builder: (context, state) => const ModulePlaceholderScreen(
-                  title: 'Caja',
-                  icon: Icons.account_balance_wallet_outlined,
-                  phase: 'UI 6',
-                ),
+                path: CashScreen.path,
+                builder: (context, state) => const CashScreen(),
               ),
             ],
           ),

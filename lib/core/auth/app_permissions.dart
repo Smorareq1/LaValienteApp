@@ -39,6 +39,10 @@ abstract final class AppPermissions {
   // Caja — Plan 0005 §7.
   static const String expensesRead = 'expenses.read';
   static const String expensesCreate = 'expenses.create';
+
+  /// Corregir un gasto ya anotado. El colaborador **no** lo tiene (plan 0006
+  /// §13): quien anotó de más llama a un admin, y el rastro queda.
+  static const String expensesUpdate = 'expenses.update';
   static const String supplySalesCreate = 'supply_sales.create';
   static const String dailyCloseRead = 'daily_close.read';
   static const String dailyCloseClose = 'daily_close.close';

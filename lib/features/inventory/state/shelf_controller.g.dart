@@ -1,33 +1,33 @@
 // GENERATED CODE - DO NOT MODIFY BY HAND
 
-part of 'app_router.dart';
+part of 'shelf_controller.dart';
 
 // **************************************************************************
 // RiverpodGenerator
 // **************************************************************************
 
-String _$appRouterHash() => r'45aed7e88c98db625cfcafe6ac76bb9c7b117a03';
+String _$shelfHash() => r'd53f6353915be7da419013ab1dea4fda19ac706e';
 
-/// Router de la app con auth guard reactivo:
-/// - Mientras se restaura la sesión → splash.
-/// - Sin sesión → cualquier ruta protegida redirige a login.
-/// - Con sesión → login/splash redirigen a Inicio.
-/// - Con sesión pero sin el permiso de la ruta → vuelve a Inicio.
+/// Lo que hay para vender, en vivo desde la BD local.
 ///
-/// Copied from [appRouter].
-@ProviderFor(appRouter)
-final appRouterProvider = Provider<GoRouter>.internal(
-  appRouter,
-  name: r'appRouterProvider',
+/// Se rehace solo cuando cambia un producto, un lote o una línea de venta: una
+/// venta capturada sin señal baja el stock de la pantalla en el acto, aunque el
+/// servidor todavía no sepa nada de ella.
+///
+/// Copied from [shelf].
+@ProviderFor(shelf)
+final shelfProvider = AutoDisposeStreamProvider<List<ProductShelf>>.internal(
+  shelf,
+  name: r'shelfProvider',
   debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
       ? null
-      : _$appRouterHash,
+      : _$shelfHash,
   dependencies: null,
   allTransitiveDependencies: null,
 );
 
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
-typedef AppRouterRef = ProviderRef<GoRouter>;
+typedef ShelfRef = AutoDisposeStreamProviderRef<List<ProductShelf>>;
 // ignore_for_file: type=lint
 // ignore_for_file: subtype_of_sealed_class, invalid_use_of_internal_member, invalid_use_of_visible_for_testing_member, deprecated_member_use_from_same_package

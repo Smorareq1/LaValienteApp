@@ -6,6 +6,9 @@ import '../storage/secure_storage_service.dart';
 import 'encrypted_connection.dart';
 import 'tables/catalog_tables.dart';
 import 'tables/customer_tables.dart';
+import 'tables/daily_close_tables.dart';
+import 'tables/expense_tables.dart';
+import 'tables/inventory_tables.dart';
 import 'tables/order_tables.dart';
 import 'tables/promotion_tables.dart';
 // El código generado inlinea el default de `syncStatus`, que sale de este enum:
@@ -42,13 +45,21 @@ part 'app_database.g.dart';
     OrderPaymentEntries,
     // Espejo de promociones (PR 5).
     PromotionEntries,
+    // Espejo del registro diario (PR 11): gastos, insumos y el acta del cierre.
+    ExpenseCategoryEntries,
+    ExpenseEntries,
+    ProductEntries,
+    ProductLotEntries,
+    SupplySaleEntries,
+    SupplySaleItemEntries,
+    DailyClosureEntries,
   ],
 )
 class AppDatabase extends _$AppDatabase {
   AppDatabase(super.executor);
 
   @override
-  int get schemaVersion => 6;
+  int get schemaVersion => 7;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -89,6 +100,21 @@ class AppDatabase extends _$AppDatabase {
       // Espejo de promociones (PR 5).
       if (from < 6) {
         await _createAll(migrator, [promotionEntries]);
+      }
+
+      // Espejo del registro diario (PR 11), lo que la Caja necesita para leerse
+      // sin señal: las categorías y los gastos del día, los productos con sus
+      // lotes para el mostrador, las ventas de insumo y el acta del cierre.
+      if (from < 7) {
+        await _createAll(migrator, [
+          expenseCategoryEntries,
+          expenseEntries,
+          productEntries,
+          productLotEntries,
+          supplySaleEntries,
+          supplySaleItemEntries,
+          dailyClosureEntries,
+        ]);
       }
 
       // Las tablas espejo nacen vacías y el cursor de pull se rebobina: el feed

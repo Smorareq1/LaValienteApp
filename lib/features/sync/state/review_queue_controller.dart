@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../core/money/fixed2.dart';
+import '../../cash/data/expenses_repository.dart';
 import '../../customers/data/customers_repository.dart';
 import '../../orders/data/orders_repository.dart';
 import '../../orders/models/order.dart';
@@ -114,14 +115,20 @@ class ReviewQueueController extends _$ReviewQueueController {
   /// Vuelve a mandarla tal como se capturó.
   ///
   /// Solo las operaciones que llevan `base_version` necesitan refrescarla, y de
-  /// esas solo llega aquí la de clientes: corregir una boleta que chocó no se
-  /// reintenta a ciegas —se vuelve a corregir sobre lo que el servidor tiene—
-  /// porque fusionar dos versiones de una boleta es adivinar (D6).
+  /// esas llegan aquí la de clientes y la de gastos: corregir una boleta que
+  /// chocó no se reintenta a ciegas —se vuelve a corregir sobre lo que el
+  /// servidor tiene— porque fusionar dos versiones de una boleta es adivinar
+  /// (D6). Un gasto es una fila de cinco campos y volver a mandarla tal cual es
+  /// una decisión que se puede tomar mirando las dos versiones.
   Future<void> retry(ReviewItem item) async {
     int? baseVersion;
     if (item.kind == ReviewKind.customerUpdate) {
       final customer = await ref.read(customersRepositoryProvider).byId(item.entityId);
       baseVersion = customer?.version;
+    }
+    if (item.kind == ReviewKind.expenseUpdate) {
+      final expense = await ref.read(expensesRepositoryProvider).byId(item.entityId);
+      baseVersion = expense?.version;
     }
     await ref.read(syncRepositoryProvider).retryReview(item, baseVersion: baseVersion);
     // Quien acaba de decidir espera que salga ahora, no en el siguiente ciclo

@@ -244,6 +244,20 @@ class _Explanation extends StatelessWidget {
             'volver a mandar los tuyos si son los correctos.',
       ReviewKind.customerUpdate || ReviewKind.customerArchive =>
         'El servidor no aceptó el cambio sobre este cliente.',
+      ReviewKind.expenseCreate =>
+        'El gasto no quedó registrado. El dinero salió del cajón, pero el día no '
+            'lo está contando según el servidor.',
+      ReviewKind.expenseUpdate when item.outcome == ReviewOutcome.conflict =>
+        'Alguien más corrigió este gasto mientras este teléfono estaba sin señal. '
+            'Tu corrección no se aplicó.',
+      ReviewKind.expenseUpdate =>
+        'El servidor no aceptó la corrección. El gasto sigue como estaba.',
+      // El caso que el D12 del plan 0005 anticipó: casi siempre es que el
+      // producto ya no alcanzaba cuando la venta llegó. El motivo del servidor
+      // trae los números, y se muestra literal debajo.
+      ReviewKind.supplySaleCreate =>
+        'La venta no quedó registrada. Suele ser que el inventario de este '
+            'teléfono estaba desactualizado y el producto ya no alcanzaba.',
       ReviewKind.unknown =>
         'Esta operación no se pudo aplicar y necesita una decisión.',
     };

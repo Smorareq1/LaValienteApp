@@ -25,3 +25,23 @@ String isoDate(DateTime date) {
   final day = date.day.toString().padLeft(2, '0');
   return '${date.year}-$month-$day';
 }
+
+/// El intervalo UTC `[inicio, fin)` que cubre el día de negocio [date].
+///
+/// Gemelo de `business_day_bounds` del backend, y hace falta por lo mismo: hay
+/// filas cuya única fecha es una marca de auditoría —el `paid_at` de un cobro—
+/// y aun así se listan "por día". El día que se quiere decir es el de la
+/// lavandería, no el UTC.
+///
+/// Semiabierto y no `<=` al final, para que un cobro hecho exactamente a
+/// medianoche pertenezca a un día y no a los dos.
+({DateTime start, DateTime end}) businessDayBounds(DateTime date) {
+  final start = DateTime.utc(date.year, date.month, date.day).subtract(_guatemalaOffset);
+  return (start: start, end: start.add(const Duration(days: 1)));
+}
+
+/// `YYYY-MM-DD` → la fecha, o `null` si el texto no lo es.
+DateTime? parseIsoDate(String value) {
+  final parsed = DateTime.tryParse(value);
+  return parsed == null ? null : DateTime(parsed.year, parsed.month, parsed.day);
+}

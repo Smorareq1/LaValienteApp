@@ -7,10 +7,10 @@ import '../../../core/auth/app_permissions.dart';
 import '../../../core/money/fixed2.dart';
 import '../../../core/time/business_date.dart';
 import '../../auth/ui/widgets/permission_gate.dart';
+import '../../customers/ui/widgets/customer_picker.dart';
 import '../domain/order_capture.dart';
 import '../state/order_capture_controller.dart';
 import 'widgets/capture_section.dart';
-import 'widgets/customer_section.dart';
 import 'widgets/garments_section.dart';
 import 'widgets/order_saved_sheet.dart';
 import 'widgets/promotions_section.dart';
@@ -362,7 +362,7 @@ class _Form extends ConsumerWidget {
           incomplete: state.customer == null,
           expanded: expanded.contains(2),
           onToggle: () => onToggle(2),
-          child: CustomerSection(
+          child: CustomerPicker(
             customer: state.customer,
             onChanged: (customer) {
               controller.setCustomer(customer);

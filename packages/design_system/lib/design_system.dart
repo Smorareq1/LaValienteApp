@@ -23,6 +23,7 @@ export 'src/atoms/app_search_field.dart';
 export 'src/atoms/app_segmented.dart';
 export 'src/atoms/app_status_badge.dart';
 export 'src/atoms/app_stepper.dart';
+export 'src/atoms/app_tab_bar.dart';
 export 'src/atoms/app_text_field.dart';
 
 export 'src/molecules/app_bottom_sheet_scaffold.dart';
@@ -31,4 +32,5 @@ export 'src/molecules/app_empty_state.dart';
 export 'src/molecules/app_form_field.dart';
 export 'src/molecules/app_list_card.dart';
 export 'src/molecules/app_section_header.dart';
+export 'src/molecules/app_stat_tile.dart';
 export 'src/molecules/app_summary_bar.dart';

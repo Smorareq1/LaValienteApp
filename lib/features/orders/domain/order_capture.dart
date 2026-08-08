@@ -1,24 +1,10 @@
+import '../../../core/money/payment_method.dart';
 import 'order_pricing.dart';
 
-/// Cómo se pagó (plan 0001 §5.3). Los dos valores son los del backend.
-enum PaymentMethod {
-  cash('cash', 'Efectivo'),
-  transfer('transfer', 'Transferencia');
-
-  const PaymentMethod(this.wire, this.label);
-
-  final String wire;
-  final String label;
-
-  /// `null` si el servidor mandó un método que esta versión no conoce; se dice,
-  /// no se adivina.
-  static PaymentMethod? fromWire(String value) {
-    for (final method in values) {
-      if (method.wire == value) return method;
-    }
-    return null;
-  }
-}
+// `PaymentMethod` se mudó a `core/money` cuando la Caja y la venta de insumo
+// empezaron a necesitarlo (UI 6). Se reexporta desde aquí para que todo lo que
+// habla de pagos de pedidos lo siga encontrando donde siempre estuvo.
+export '../../../core/money/payment_method.dart' show PaymentMethod;
 
 /// Una línea de prendas: tipo, cuántas y la nota de esa línea.
 class GarmentDraft {
