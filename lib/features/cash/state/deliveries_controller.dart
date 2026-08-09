@@ -73,6 +73,20 @@ class DeliverySelection extends _$DeliverySelection {
     state = next;
   }
 
+  /// Marca una boleta, y no hace nada si ya estaba marcada. Devuelve si esta
+  /// llamada fue la que la marcó.
+  ///
+  /// Aparte de [toggle] a propósito. Tocar una fila dos veces quiere decir «me
+  /// equivoqué»; escanear la misma boleta dos veces quiere decir «esta», dicho
+  /// dos veces —pasa barriendo una pila de papeles, cuando no se recuerda si
+  /// esa ya fue—. Un escaneo que desmarcara perdería justo la boleta que se
+  /// acaba de confirmar, y en silencio.
+  bool mark(OrderListItem order) {
+    if (state.containsKey(order.id)) return false;
+    state = {...state, order.id: DeliveryLine.of(order)};
+    return true;
+  }
+
   /// Cambia lo que paga una boleta ya marcada. Si no está marcada no hace nada:
   /// cobrar algo que nadie dijo que se entregó sería inventar el movimiento.
   void setPayment(

@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/auth/app_permissions.dart';
 import '../../../core/money/fixed2.dart';
 import '../../../core/money/payment_method.dart';
+import '../../../core/network/connectivity.dart';
 import '../../../core/time/business_date.dart';
 import '../../auth/state/auth_controller.dart';
 import '../../auth/ui/widgets/permission_gate.dart';
@@ -18,6 +19,7 @@ import '../models/delivery_line.dart';
 import '../models/expense.dart';
 import '../state/cash_day_controller.dart';
 import '../state/deliveries_controller.dart';
+import '../state/ticket_lookup_controller.dart';
 import 'day_close_screen.dart';
 import 'supply_sale_screen.dart';
 import 'widgets/delivery_batch_sheet.dart';
@@ -416,7 +418,47 @@ class _DeliveriesCardState extends ConsumerState<_DeliveriesCard> {
   /// resto de la Caja fuera de la pantalla.
   static const int _preview = 4;
 
+  /// Propio y no del campo, para que el escáner pueda dejar escrito lo que leyó
+  /// cuando no encontró la boleta.
+  final TextEditingController _search = TextEditingController();
+
   bool _showAll = false;
+
+  @override
+  void dispose() {
+    _search.dispose();
+    super.dispose();
+  }
+
+  /// Qué se dice después de escanear. Cada final tiene su frase porque cada uno
+  /// pide algo distinto de quien está en el mostrador.
+  void _sayOutcome(TicketLookupOutcome outcome) {
+    final message = switch (outcome) {
+      TicketLookupCancelled() => null,
+      TicketMarked(:final order, wasAlreadyMarked: true) =>
+        'La ${order.reference} ya estaba marcada.',
+      TicketMarked(:final order) =>
+        'Marcada la ${order.reference} · ${order.customerName}',
+      TicketAlreadyClosed(:final match) =>
+        'La boleta ${orderReference(match.dailyNumber)} ya no está abierta: '
+            'se entregó o se anuló.',
+      TicketNotMirrored(:final match) =>
+        'La boleta ${orderReference(match.dailyNumber)} existe pero este '
+            'teléfono aún no la tiene. Sincroniza y volvé a intentar.',
+      TicketAmbiguous(:final matches) =>
+        'El serial y el número apuntan a boletas distintas '
+            '(${matches.map((m) => orderReference(m.dailyNumber)).join(' y ')}). '
+            'Buscala a mano.',
+      TicketNotFound(wasUnreadable: true) =>
+        'No se pudo leer el número de la boleta. Escribilo en el buscador.',
+      TicketNotFound(:final read) =>
+        'Leyó «$read» y no hay ninguna boleta abierta con ese número. '
+            'Corregilo en el buscador.',
+      TicketLookupFailed(:final failure) => failure.message,
+    };
+    if (message == null || !mounted) return;
+    _say(context, message);
+  }
 
   Future<void> _register() async {
     final outcome = await DeliveryBatchSheet.show(context);
@@ -441,6 +483,13 @@ class _DeliveriesCardState extends ConsumerState<_DeliveriesCard> {
     final selection = ref.watch(deliverySelectionProvider);
     final batch = ref.watch(deliveryBatchProvider);
     final searching = ref.watch(deliverySearchQueryProvider).trim().isNotEmpty;
+
+    // El campo es un espejo del filtro y no su dueño: así lo que el escáner
+    // dejó escrito se ve, en vez de filtrar la lista por algo que la caja de
+    // texto no muestra.
+    ref.listen(deliverySearchQueryProvider, (_, next) {
+      if (_search.text != next) _search.text = next;
+    });
 
     final visible = _showAll || matches.length <= _preview
         ? matches
@@ -473,11 +522,21 @@ class _DeliveriesCardState extends ConsumerState<_DeliveriesCard> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              AppSearchField(
-                hintText: 'No. de boleta o cliente',
-                backgroundColor: AppColors.gray50,
-                onChanged: (value) =>
-                    ref.read(deliverySearchQueryProvider.notifier).update(value),
+              Row(
+                children: [
+                  Expanded(
+                    child: AppSearchField(
+                      key: const ValueKey('delivery-search'),
+                      controller: _search,
+                      hintText: 'No. de boleta o cliente',
+                      backgroundColor: AppColors.gray50,
+                      onChanged: (value) =>
+                          ref.read(deliverySearchQueryProvider.notifier).update(value),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  _ScanTicketButton(onDone: _sayOutcome),
+                ],
               ),
               const SizedBox(height: 10),
               Text(
@@ -538,6 +597,72 @@ class _DeliveriesCardState extends ConsumerState<_DeliveriesCard> {
           ),
         ),
       ],
+    );
+  }
+}
+
+/// Escanear la boleta para marcarla, al lado del buscador (§7.1.1).
+///
+/// El acelerador y no el camino: teclear el número funciona siempre y contra la
+/// BD local, esto necesita señal porque la foto la lee un modelo que vive del
+/// otro lado (plan 0003 D8). Sin conexión se muestra apagado y lo dice al
+/// tocarlo, como el chip de la toma de pedido — esconderlo dejaría a quien lo
+/// busca creyendo que la app lo perdió.
+class _ScanTicketButton extends ConsumerWidget {
+  const _ScanTicketButton({required this.onDone});
+
+  final ValueChanged<TicketLookupOutcome> onDone;
+
+  Future<void> _scan(BuildContext context, WidgetRef ref) async {
+    // Cámara y no galería: acá la boleta está en la mano. La galería es del
+    // otro escaneo, donde llegan fotos por WhatsApp.
+    final outcome = await ref
+        .read(ticketLookupControllerProvider.notifier)
+        .scan(AppImageSource.camera);
+    onDone(outcome);
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final online = ref.watch(connectivityChangesProvider).valueOrNull ?? true;
+    final busy = ref.watch(ticketLookupControllerProvider);
+    final radius = BorderRadius.circular(14);
+
+    return Material(
+      color: online ? AppColors.secondary50 : AppColors.gray100,
+      borderRadius: radius,
+      child: InkWell(
+        borderRadius: radius,
+        onTap: busy
+            ? null
+            : () {
+                if (!online) {
+                  _say(
+                    context,
+                    'Escanear necesita señal. Buscá la boleta por su número.',
+                  );
+                  return;
+                }
+                _scan(context, ref);
+              },
+        child: SizedBox(
+          width: 46,
+          height: 44,
+          child: Center(
+            child: busy
+                ? const SizedBox(
+                    width: 17,
+                    height: 17,
+                    child: CircularProgressIndicator(strokeWidth: 2.2),
+                  )
+                : Icon(
+                    Icons.document_scanner_outlined,
+                    size: 19,
+                    color: online ? AppColors.secondary700 : AppColors.gray400,
+                  ),
+          ),
+        ),
+      ),
     );
   }
 }

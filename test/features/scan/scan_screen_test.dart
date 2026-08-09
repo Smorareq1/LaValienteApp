@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:la_valiente/core/errors/app_failure.dart';
 import 'package:la_valiente/features/scan/data/scan_remote_datasource.dart';
 import 'package:la_valiente/features/scan/models/scan.dart';
+import 'package:la_valiente/features/scan/models/ticket_lookup.dart';
 import 'package:la_valiente/features/scan/state/scan_controller.dart';
 import 'package:la_valiente/features/scan/ui/scan_screen.dart';
 
@@ -27,6 +28,14 @@ class _FakeScans implements ScanRemoteDataSource {
 
   @override
   Future<ScanResult> get(String scanId) async => result!;
+
+  /// La búsqueda para entregar vive en Caja y tiene sus propias pruebas; acá
+  /// solo hace falta que el doble siga siendo del tipo.
+  @override
+  Future<TicketLookupResult> lookup(
+    Uint8List image, {
+    String filename = 'boleta.jpg',
+  }) => throw UnimplementedError();
 }
 
 /// Un PNG de un pixel: `Image.memory` necesita bytes que de verdad decodifiquen.

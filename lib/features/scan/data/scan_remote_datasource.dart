@@ -6,6 +6,7 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../core/network/api_client.dart';
 import '../models/scan.dart';
+import '../models/ticket_lookup.dart';
 
 part 'scan_remote_datasource.g.dart';
 
@@ -39,6 +40,28 @@ class ScanRemoteDataSource {
       options: Options(receiveTimeout: const Duration(seconds: 60)),
     );
     return ScanResult.fromJson(response.data!);
+  }
+
+  /// Manda la foto de una boleta **que ya existe** y devuelve cuál es
+  /// (plan 0006 §7.1.1).
+  ///
+  /// Misma foto, mismo modelo y mismo prompt que `scan`; lo que cambia es la
+  /// pregunta. Acá no se captura nada: la respuesta son los identificadores del
+  /// papel y el pedido al que apuntan, para que el mostrador lo marque sin
+  /// teclear. Entregarlo sigue siendo cosa de la entrega, con su permiso.
+  Future<TicketLookupResult> lookup(
+    Uint8List image, {
+    String filename = 'boleta.jpg',
+  }) async {
+    final form = FormData.fromMap({
+      'file': MultipartFile.fromBytes(image, filename: filename),
+    });
+    final response = await _dio.post<Map<String, dynamic>>(
+      '/scans/lookup',
+      data: form,
+      options: Options(receiveTimeout: const Duration(seconds: 60)),
+    );
+    return TicketLookupResult.fromJson(response.data!);
   }
 
   Future<ScanResult> get(String scanId) async {

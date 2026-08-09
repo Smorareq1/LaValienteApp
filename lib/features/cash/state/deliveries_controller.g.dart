@@ -91,7 +91,7 @@ final deliverySearchQueryProvider =
     );
 
 typedef _$DeliverySearchQuery = AutoDisposeNotifier<String>;
-String _$deliverySelectionHash() => r'96353d6804931713d571f8b75162cdba3c5e00a9';
+String _$deliverySelectionHash() => r'566b7839ea1aeaa17c37106f30815498628758de';
 
 /// Las boletas marcadas para entregar, por id de pedido.
 ///
