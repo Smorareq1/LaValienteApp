@@ -14,6 +14,10 @@ import 'capture_section.dart';
 /// app. Lo único que decide el código es el control, y lo decide por modalidad
 /// de cobro — escalonado se cuenta por opción, variable se teclea, el resto es
 /// un stepper.
+///
+/// Los bloques salen en el orden de la boleta de papel: el peso arriba, después
+/// cada servicio escalonado con su encabezado, los agregados juntos bajo
+/// "Extras" y el motorista al final.
 class ServicesSection extends StatelessWidget {
   const ServicesSection({
     super.key,
@@ -52,6 +56,11 @@ class ServicesSection extends StatelessWidget {
     }
 
     final blocks = <Widget>[];
+    // Los agregados y el motorista se juntan en un bloque cada uno en vez de
+    // dejar cada servicio suelto: en el papel también son dos renglones, no
+    // ocho.
+    final extras = <ServiceType>[];
+    final couriers = <ServiceType>[];
 
     for (final service in services) {
       if (service.code == kWashByWeightCode) {
@@ -70,52 +79,33 @@ class ServicesSection extends StatelessWidget {
 
       switch (service.pricingMode) {
         case PricingMode.variable:
-          blocks.add(
-            _VariableService(
-              service: service,
-              amount: variableAmounts[service.code] ?? '',
-              onChanged: (value) => onVariableChanged(service.code, value),
-            ),
-          );
+          couriers.add(service);
         case PricingMode.tiered:
           blocks.add(
-            _ServiceGroup(
+            _Group(
               title: service.name,
-              rows: [
-                for (final option in service.options)
-                  _CountedRow(
-                    key: ValueKey('${service.code}/${option.code}'),
-                    title: option.name,
-                    detail: _detail(
-                      book.unitPrice(service, option),
-                      quantities[serviceKey(service.code, option.code)] ?? 0,
-                      service.unitLabel,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  for (final option in service.options)
+                    _CountedRow(
+                      key: ValueKey('${service.code}/${option.code}'),
+                      title: option.name,
+                      detail: _detail(
+                        book.unitPrice(service, option),
+                        quantities[serviceKey(service.code, option.code)] ?? 0,
+                        service.unitLabel,
+                      ),
+                      quantity: quantities[serviceKey(service.code, option.code)] ?? 0,
+                      onChanged: (value) =>
+                          onServiceChanged(service.code, option.code, value),
                     ),
-                    quantity: quantities[serviceKey(service.code, option.code)] ?? 0,
-                    onChanged: (value) =>
-                        onServiceChanged(service.code, option.code, value),
-                  ),
-              ],
+                ],
+              ),
             ),
           );
         case PricingMode.perUnit:
-          blocks.add(
-            _ServiceGroup(
-              rows: [
-                _CountedRow(
-                  key: ValueKey(service.code),
-                  title: service.name,
-                  detail: _detail(
-                    book.unitPrice(service, null),
-                    quantities[serviceKey(service.code)] ?? 0,
-                    service.unitLabel,
-                  ),
-                  quantity: quantities[serviceKey(service.code)] ?? 0,
-                  onChanged: (value) => onServiceChanged(service.code, null, value),
-                ),
-              ],
-            ),
-          );
+          extras.add(service);
         case null:
           // Modalidad desconocida: se dice, no se dibuja un control inventado.
           blocks.add(
@@ -128,11 +118,49 @@ class ServicesSection extends StatelessWidget {
       }
     }
 
+    if (extras.isNotEmpty) {
+      blocks.add(
+        _Group(
+          title: 'Extras',
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              for (final service in extras)
+                _CountedRow(
+                  key: ValueKey(service.code),
+                  title: service.name,
+                  detail: _detail(
+                    book.unitPrice(service, null),
+                    quantities[serviceKey(service.code)] ?? 0,
+                    service.unitLabel,
+                  ),
+                  quantity: quantities[serviceKey(service.code)] ?? 0,
+                  onChanged: (value) => onServiceChanged(service.code, null, value),
+                ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    if (couriers.isNotEmpty) {
+      blocks.add(
+        _Group(
+          title: 'Motorista',
+          child: _CourierAmounts(
+            services: couriers,
+            amounts: variableAmounts,
+            onChanged: onVariableChanged,
+          ),
+        ),
+      );
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         for (final block in blocks)
-          Padding(padding: const EdgeInsets.only(bottom: 10), child: block),
+          Padding(padding: const EdgeInsets.only(bottom: 14), child: block),
       ],
     );
   }
@@ -152,20 +180,17 @@ class ServicesSection extends StatelessWidget {
   }
 }
 
-class _ServiceGroup extends StatelessWidget {
-  const _ServiceGroup({required this.rows, this.title});
+class _Group extends StatelessWidget {
+  const _Group({required this.title, required this.child});
 
-  final String? title;
-  final List<Widget> rows;
+  final String title;
+  final Widget child;
 
   @override
   Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        if (title != null) CaptureLabel(title!.toUpperCase()),
-        ...rows,
-      ],
+      children: [CaptureGroupLabel(title), child],
     );
   }
 }
@@ -192,7 +217,7 @@ class _CountedRow extends StatelessWidget {
 
     return Container(
       margin: const EdgeInsets.only(bottom: 6),
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      padding: const EdgeInsets.fromLTRB(12, 7, 9, 7),
       decoration: BoxDecoration(
         color: active ? AppColors.secondary50 : AppColors.gray50,
         borderRadius: BorderRadius.circular(13),
@@ -209,16 +234,25 @@ class _CountedRow extends StatelessWidget {
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: AppTypography.bodySm.copyWith(
-                    fontSize: 13.5,
+                    fontSize: 13,
                     fontWeight: FontWeight.w700,
-                    color: active ? AppColors.secondary700 : AppColors.textPrimary,
+                    color: AppColors.gray800,
                   ),
                 ),
-                Text(detail, style: AppTypography.helper.copyWith(fontSize: 11.5)),
+                Text(
+                  detail,
+                  style: AppTypography.helper.copyWith(fontSize: 10.5),
+                ),
               ],
             ),
           ),
-          AppStepper(value: quantity, size: AppStepperSize.md, onChanged: onChanged),
+          const SizedBox(width: 9),
+          AppStepper(
+            value: quantity,
+            size: AppStepperSize.sm,
+            accent: AppStepperAccent.secondary,
+            onChanged: onChanged,
+          ),
         ],
       ),
     );
@@ -277,10 +311,10 @@ class _WashByWeightState extends State<_WashByWeight> {
         : Fixed2.multiply(price, lbs);
 
     return Container(
-      padding: const EdgeInsets.all(11),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
       decoration: BoxDecoration(
         color: widget.enabled ? AppColors.secondary50 : AppColors.gray50,
-        borderRadius: BorderRadius.circular(13),
+        borderRadius: BorderRadius.circular(14),
         border: Border.all(
           color: widget.enabled ? AppColors.secondary300 : AppColors.gray100,
         ),
@@ -297,17 +331,17 @@ class _WashByWeightState extends State<_WashByWeight> {
                       widget.service.name,
                       style: AppTypography.bodySm.copyWith(
                         fontSize: 13.5,
-                        fontWeight: FontWeight.w700,
-                        color: widget.enabled
-                            ? AppColors.secondary700
-                            : AppColors.textPrimary,
+                        fontWeight: FontWeight.w800,
                       ),
                     ),
                     Text(
                       price == null
                           ? 'Sin precio vigente'
                           : 'Q${Fixed2.format(price)} por libra',
-                      style: AppTypography.helper.copyWith(fontSize: 11.5),
+                      style: AppTypography.helper.copyWith(
+                        fontSize: 11,
+                        color: AppColors.gray500,
+                      ),
                     ),
                   ],
                 ),
@@ -323,21 +357,44 @@ class _WashByWeightState extends State<_WashByWeight> {
             ],
           ),
           if (widget.enabled) ...[
-            const SizedBox(height: 8),
+            const Padding(
+              padding: EdgeInsets.only(top: 10),
+              child: Divider(height: 1, thickness: 1, color: AppColors.secondary300),
+            ),
+            const SizedBox(height: 10),
             Row(
               children: [
-                Expanded(
+                SizedBox(
+                  width: 86,
                   child: AppTextField(
                     controller: _weight,
-                    hintText: 'Libras',
+                    hintText: '0',
                     keyboardType: const TextInputType.numberWithOptions(decimal: true),
                     inputFormatters: decimalInputFormatters,
                     onChanged: widget.onWeightChanged,
                   ),
                 ),
-                const SizedBox(width: 10),
+                const SizedBox(width: 9),
+                if (price != null)
+                  Flexible(
+                    child: Text(
+                      'lbs × Q${Fixed2.format(price)}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppTypography.bodySm.copyWith(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.gray500,
+                      ),
+                    ),
+                  ),
+                const Spacer(),
                 if (line != null)
-                  AppMoneyText(Fixed2.toDouble(line), size: AppMoneySize.lg),
+                  AppMoneyText(
+                    Fixed2.toDouble(line),
+                    size: AppMoneySize.lg,
+                    color: AppColors.secondary700,
+                  ),
               ],
             ),
           ],
@@ -347,24 +404,57 @@ class _WashByWeightState extends State<_WashByWeight> {
   }
 }
 
-/// Servicio `variable`: recepción y entrega, donde el monto es lo que cobró el
-/// motorista y no sale de ningún catálogo.
-class _VariableService extends StatefulWidget {
-  const _VariableService({
-    required this.service,
+/// Los montos del motorista: recepción y entrega, uno al lado del otro. El monto
+/// es lo que cobró él y no sale de ningún catálogo.
+class _CourierAmounts extends StatelessWidget {
+  const _CourierAmounts({
+    required this.services,
+    required this.amounts,
+    required this.onChanged,
+  });
+
+  final List<ServiceType> services;
+  final Map<String, String> amounts;
+  final void Function(String serviceCode, String amount) onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        for (final service in services) ...[
+          if (service != services.first) const SizedBox(width: 9),
+          Expanded(
+            child: _CourierField(
+              key: ValueKey(service.code),
+              label: service.name,
+              amount: amounts[service.code] ?? '',
+              onChanged: (value) => onChanged(service.code, value),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class _CourierField extends StatefulWidget {
+  const _CourierField({
+    super.key,
+    required this.label,
     required this.amount,
     required this.onChanged,
   });
 
-  final ServiceType service;
+  final String label;
   final String amount;
   final ValueChanged<String> onChanged;
 
   @override
-  State<_VariableService> createState() => _VariableServiceState();
+  State<_CourierField> createState() => _CourierFieldState();
 }
 
-class _VariableServiceState extends State<_VariableService> {
+class _CourierFieldState extends State<_CourierField> {
   late final TextEditingController _amount = TextEditingController(text: widget.amount);
 
   @override
@@ -375,26 +465,24 @@ class _VariableServiceState extends State<_VariableService> {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Expanded(
+        Padding(
+          padding: const EdgeInsets.only(bottom: 5),
           child: Text(
-            widget.service.name,
-            style: AppTypography.bodySm.copyWith(
-              fontSize: 13.5,
-              fontWeight: FontWeight.w700,
-            ),
+            widget.label,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: AppTypography.label.copyWith(fontSize: 11.5),
           ),
         ),
-        SizedBox(
-          width: 130,
-          child: AppTextField(
-            controller: _amount,
-            hintText: 'Q 0.00',
-            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            inputFormatters: decimalInputFormatters,
-            onChanged: widget.onChanged,
-          ),
+        AppTextField(
+          controller: _amount,
+          hintText: 'Q 0.00',
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          inputFormatters: decimalInputFormatters,
+          onChanged: widget.onChanged,
         ),
       ],
     );

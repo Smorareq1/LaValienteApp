@@ -199,22 +199,20 @@ class _DetailState extends ConsumerState<_Detail> {
     final locks = _locks();
     final status = order.status;
 
-    final forward = status?.forwardStep;
     final canDeliver =
         (status?.canBeDelivered ?? false) && !locks.today && _can(AppPermissions.ordersDeliver);
-    final canAdvance = forward != null && _can(AppPermissions.ordersUpdate);
     final canCollect = (status?.acceptsPayments ?? false) &&
         order.hasBalance &&
         !locks.today &&
         _can(AppPermissions.ordersCollectPayment);
 
-    // La acción principal es una sola, la que mueve el pedido hacia adelante.
-    // Entregar gana sobre avanzar porque desde `listo` es la única salida.
+    // Entregar es la acción principal desde cualquier estado vivo (plan 0001
+    // D13). Marcar «en proceso» o «listo» sigue estando, pero abajo con las
+    // demás: es contabilidad opcional, y ponerla acá arriba volvería a sugerir
+    // que hay que darla antes de poder entregar.
     final (String, VoidCallback)? primary = canDeliver
         ? ('Entregar pedido', () => context.push(OrderDeliverScreen.pathFor(order.id)))
-        : canAdvance
-            ? (_forwardLabel(forward), () => _advance(forward))
-            : null;
+        : null;
 
     return Stack(
       children: [
@@ -240,13 +238,6 @@ class _DetailState extends ConsumerState<_Detail> {
       ],
     );
   }
-
-  static String _forwardLabel(OrderStatus next) => switch (next) {
-    OrderStatus.inProgress => 'Pasar a proceso',
-    OrderStatus.ready => 'Marcar listo',
-    // Entregar y anular no llegan por aquí: tienen su propia pantalla.
-    _ => 'Marcar ${next.label.toLowerCase()}',
-  };
 
   Widget _body(_Locks locks) {
     return ListView(
@@ -1222,6 +1213,13 @@ class _AuditCard extends StatelessWidget {
 /// Corregir, anular y deshacer un paso: lo que no mueve el pedido hacia
 /// adelante vive aquí y no en la barra de abajo, para que la acción principal
 /// no compita con la de arreglar un error.
+String _forwardLabel(OrderStatus next) => switch (next) {
+  OrderStatus.inProgress => 'Pasar a proceso',
+  OrderStatus.ready => 'Marcar listo',
+  // Entregar y anular no llegan por aquí: tienen su propia pantalla.
+  _ => 'Marcar ${next.label.toLowerCase()}',
+};
+
 class _SecondaryActions extends StatelessWidget {
   const _SecondaryActions({
     required this.order,
@@ -1243,13 +1241,20 @@ class _SecondaryActions extends StatelessWidget {
     if (status == null) return const SizedBox.shrink();
 
     final back = status.backStep;
+    // El paso hacia adelante de la cadena (§7.1). Vive acá abajo y no en la
+    // barra de acciones porque es opcional: sirve para saber qué hay en lavado,
+    // y entregar no lo exige. Va sin candado de fecha, igual que el de volver
+    // atrás: mover la ropa por el taller no mueve el dinero de ningún día.
+    final forward = status.forwardStep;
     // Corregir la boleta (§7.3). Un pedido `listo` pide además el permiso de
     // admin, y por eso son dos puertas y no una: el colaborador ve el botón
     // mientras el pedido está en el local, y deja de verlo cuando ya se lavó.
     final canEdit = status.canBeEdited && !locks.orderDay;
     final canCancel = status.canBeCancelled && !locks.orderDay;
 
-    if (!canEdit && !canCancel && back == null) return const SizedBox.shrink();
+    if (!canEdit && !canCancel && back == null && forward == null) {
+      return const SizedBox.shrink();
+    }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1289,6 +1294,19 @@ class _SecondaryActions extends StatelessWidget {
                   ),
                 ),
             ],
+          ),
+        if (forward != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: PermissionGate(
+              anyOf: const [AppPermissions.ordersUpdate],
+              child: _QuietButton(
+                label: _forwardLabel(forward),
+                icon: Icons.local_laundry_service_outlined,
+                iconColor: AppColors.secondary700,
+                onPressed: busy ? null : () => onAdvance(forward),
+              ),
+            ),
           ),
         if (back != null)
           Padding(

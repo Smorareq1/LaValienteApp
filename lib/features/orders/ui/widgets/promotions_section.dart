@@ -81,8 +81,13 @@ class _PromotionChip extends StatelessWidget {
     final foreground = selected ? AppColors.white : AppColors.gray600;
 
     return Material(
-      color: selected ? AppColors.primary500 : AppColors.gray100,
-      borderRadius: AppRadius.fullAll,
+      color: selected ? AppColors.primary500 : AppColors.white,
+      // Sin marcar es un contorno y no un relleno gris: así el chip elegido es
+      // la única mancha de color de la sección y se ve de un vistazo cuál es.
+      shape: RoundedRectangleBorder(
+        borderRadius: AppRadius.fullAll,
+        side: BorderSide(color: selected ? AppColors.primary500 : AppColors.border),
+      ),
       child: InkWell(
         onTap: onTap,
         borderRadius: AppRadius.fullAll,

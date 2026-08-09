@@ -84,13 +84,14 @@ final reviewQueueCountProvider = StreamProvider<int>.internal(
 // ignore: unused_element
 typedef ReviewQueueCountRef = StreamProviderRef<int>;
 String _$syncStatusControllerHash() =>
-    r'4be6cba66871004c1a3b18b28bb342405d4c2be2';
+    r'4afc71762701a4b739ebe2f72a26ba0a6718f9ad';
 
 /// Estado de la cola de sincronización que consume el AppBar del shell.
 ///
 /// Compone tres fuentes: la fase del motor, el outbox y la cola de revisión.
 /// El orden de prioridad no es estético — lo que necesita una decisión humana
-/// tapa a lo que solo necesita esperar.
+/// tapa a lo que solo necesita esperar, y un motor caído tapa a una cola que
+/// espera, porque una cola que espera avanza sola y un motor caído no.
 ///
 /// Copied from [SyncStatusController].
 @ProviderFor(SyncStatusController)

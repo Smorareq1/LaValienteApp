@@ -9,14 +9,18 @@ import '../../../core/money/payment_method.dart';
 import '../../../core/time/business_date.dart';
 import '../../auth/state/auth_controller.dart';
 import '../../auth/ui/widgets/permission_gate.dart';
+import '../../orders/models/order.dart';
 import '../../shell/ui/widgets/gradient_header.dart';
 import '../data/expenses_repository.dart';
 import '../domain/cash_day.dart';
 import '../models/cash_entry.dart';
+import '../models/delivery_line.dart';
 import '../models/expense.dart';
 import '../state/cash_day_controller.dart';
+import '../state/deliveries_controller.dart';
 import 'day_close_screen.dart';
 import 'supply_sale_screen.dart';
+import 'widgets/delivery_batch_sheet.dart';
 import 'widgets/expense_sheet.dart';
 
 /// Caja del día (Plan 0006 §7.1): la hoja de Registro Diario en pantalla.
@@ -39,6 +43,11 @@ class _CashScreenState extends ConsumerState<CashScreen> {
   @override
   Widget build(BuildContext context) {
     final day = ref.watch(selectedCashDayProvider);
+    // Las entregas se registran contra **hoy**: la ropa del lunes se devuelve el
+    // miércoles y el dinero entra el miércoles (plan 0001 §7.2). Mirando un día
+    // pasado la Caja es un informe, así que el bloque de captura no aparece.
+    final isToday =
+        isoDate(ref.watch(cashDateFilterProvider)) == isoDate(businessDate());
 
     return Stack(
       children: [
@@ -60,6 +69,13 @@ class _CashScreenState extends ConsumerState<CashScreen> {
                           ],
                           _DaySummary(day: day),
                           const SizedBox(height: 14),
+                          if (!day.isClosed && isToday) ...[
+                            PermissionGate(
+                              anyOf: const [AppPermissions.ordersDeliver],
+                              child: const _DeliveriesCard(),
+                            ),
+                            const SizedBox(height: 14),
+                          ],
                         ],
                       ),
                     ),
@@ -378,6 +394,348 @@ class _PendingNote extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+/// Entregas y cobros: donde se registra el ingreso (plan 0006 §7.1.1).
+///
+/// El mostrador no marca «en proceso» ni «listo» ni entra pedido por pedido: al
+/// cierre dice "de las que tenía, entregué estas" y anota boleta, cliente y
+/// cuánto pagó. Eso es a la vez la entrega y el ingreso, y por eso vive acá y no
+/// en Pedidos — el lado de ingresos de la hoja es lo que la persona escribe.
+class _DeliveriesCard extends ConsumerStatefulWidget {
+  const _DeliveriesCard();
+
+  @override
+  ConsumerState<_DeliveriesCard> createState() => _DeliveriesCardState();
+}
+
+class _DeliveriesCardState extends ConsumerState<_DeliveriesCard> {
+  /// Cuántas boletas se ven antes de "ver todas". Cuatro caben sin empujar el
+  /// resto de la Caja fuera de la pantalla.
+  static const int _preview = 4;
+
+  bool _showAll = false;
+
+  Future<void> _register() async {
+    final outcome = await DeliveryBatchSheet.show(context);
+    if (outcome == null || !mounted) return;
+
+    final entregadas = outcome.delivered == 1
+        ? '1 boleta entregada'
+        : '${outcome.delivered} boletas entregadas';
+    _say(
+      context,
+      outcome.isClean
+          ? '$entregadas · +Q${Fixed2.format(outcome.collected)} en caja'
+          : '$entregadas. No se pudo con ${outcome.failures.length}: '
+                '${outcome.failures.first}',
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final open = ref.watch(openOrdersProvider).valueOrNull ?? const <OrderListItem>[];
+    final matches = ref.watch(deliverableOrdersProvider);
+    final selection = ref.watch(deliverySelectionProvider);
+    final batch = ref.watch(deliveryBatchProvider);
+    final searching = ref.watch(deliverySearchQueryProvider).trim().isNotEmpty;
+
+    final visible = _showAll || matches.length <= _preview
+        ? matches
+        : matches.take(_preview).toList();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        AppSectionHeader(
+          title: 'ENTREGAS Y COBROS',
+          trailing: open.isEmpty
+              ? null
+              : Text(
+                  open.length == 1 ? '1 sin entregar' : '${open.length} sin entregar',
+                  style: AppTypography.helper.copyWith(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+        ),
+        Container(
+          padding: const EdgeInsets.fromLTRB(13, 13, 13, 13),
+          decoration: BoxDecoration(
+            color: AppColors.white,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: AppColors.border),
+            boxShadow: AppShadows.card,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              AppSearchField(
+                hintText: 'No. de boleta o cliente',
+                backgroundColor: AppColors.gray50,
+                onChanged: (value) =>
+                    ref.read(deliverySearchQueryProvider.notifier).update(value),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                'Marca las que entregaste. La boleta se cierra al entregarla: no hay '
+                'que pasarla por «en proceso» ni «lista».',
+                style: AppTypography.helper.copyWith(fontSize: 11.5),
+              ),
+              if (open.isEmpty)
+                const _DeliveriesNote(
+                  icon: Icons.check_circle_outline_rounded,
+                  message: 'No queda ropa pendiente de entregar.',
+                )
+              else if (visible.isEmpty)
+                const _DeliveriesNote(
+                  icon: Icons.search_off_rounded,
+                  message: 'Ninguna boleta abierta con ese número ni ese nombre.',
+                )
+              else ...[
+                const Divider(height: 18),
+                for (final order in visible)
+                  _OpenOrderRow(
+                    order: order,
+                    marked: selection.containsKey(order.id),
+                    onTap: () =>
+                        ref.read(deliverySelectionProvider.notifier).toggle(order),
+                  ),
+                if (!_showAll && matches.length > _preview)
+                  GestureDetector(
+                    onTap: () => setState(() => _showAll = true),
+                    child: Padding(
+                      padding: const EdgeInsets.only(top: 4),
+                      child: Text(
+                        searching
+                            ? 'Ver las ${matches.length} que coinciden'
+                            : 'Ver las ${matches.length} pendientes',
+                        textAlign: TextAlign.center,
+                        style: AppTypography.bodySm.copyWith(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.primary,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+              if (!batch.isEmpty) ...[
+                const SizedBox(height: 11),
+                _SelectionBar(batch: batch, onRegister: _register),
+              ] else if (open.isNotEmpty) ...[
+                const SizedBox(height: 11),
+                const _DeliveriesNote(
+                  icon: Icons.info_outline_rounded,
+                  message: 'Las que no marques siguen abiertas mañana, con su saldo.',
+                  inset: false,
+                ),
+              ],
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _OpenOrderRow extends StatelessWidget {
+  const _OpenOrderRow({
+    required this.order,
+    required this.marked,
+    required this.onTap,
+  });
+
+  final OrderListItem order;
+  final bool marked;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    // La serie de imprenta es como la llama el mostrador; el correlativo es el
+    // último recurso, para una boleta sin serie o que todavía no subió.
+    final label = order.bookletSerial ?? order.reference;
+
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 9),
+        child: Row(
+          children: [
+            Container(
+              width: 24,
+              height: 24,
+              decoration: BoxDecoration(
+                color: marked ? AppColors.primary : AppColors.white,
+                border: Border.all(
+                  color: marked ? AppColors.primary : AppColors.gray300,
+                  width: 2,
+                ),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: marked
+                  ? const Icon(Icons.check_rounded, size: 15, color: AppColors.white)
+                  : null,
+            ),
+            const SizedBox(width: 11),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: AppColors.gray100,
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          label,
+                          style: AppTypography.helper.copyWith(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w800,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 7),
+                      Expanded(
+                        child: Text(
+                          order.customerName,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: AppTypography.bodySm.copyWith(
+                            fontSize: 13.5,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    [
+                      '${order.totalPieces} ${order.totalPieces == 1 ? 'pieza' : 'piezas'}',
+                      if (order.paid > 0) 'anticipo Q${Fixed2.format(order.paid)}',
+                    ].join(' · '),
+                    style: AppTypography.helper.copyWith(fontSize: 11),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                AppMoneyText(order.balanceAsDouble, size: AppMoneySize.md),
+                Text(
+                  'saldo',
+                  style: AppTypography.helper.copyWith(
+                    fontSize: 9.5,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Lo marcado, con el botón que abre el repaso.
+class _SelectionBar extends StatelessWidget {
+  const _SelectionBar({required this.batch, required this.onRegister});
+
+  final DeliveryBatch batch;
+  final VoidCallback onRegister;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(11, 10, 10, 10),
+      decoration: BoxDecoration(
+        color: AppColors.primary50,
+        border: Border.all(color: AppColors.primary100),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  batch.count == 1
+                      ? '1 boleta marcada · Q${Fixed2.format(batch.balance)}'
+                      : '${batch.count} boletas marcadas · Q${Fixed2.format(batch.balance)}',
+                  style: AppTypography.bodySm.copyWith(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.primary700,
+                  ),
+                ),
+                Text(
+                  'por cobrar al entregarlas',
+                  style: AppTypography.helper.copyWith(
+                    fontSize: 10.5,
+                    color: AppColors.primary700,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 9),
+          AppButton(
+            label: 'Registrar',
+            elevated: true,
+            size: AppButtonSize.sm,
+            onPressed: onRegister,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DeliveriesNote extends StatelessWidget {
+  const _DeliveriesNote({
+    required this.icon,
+    required this.message,
+    this.inset = true,
+  });
+
+  final IconData icon;
+  final String message;
+
+  /// Con separación propia cuando reemplaza a la lista; sin ella cuando ya va
+  /// dentro de una fila con su espacio.
+  final bool inset;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.only(top: inset ? 12 : 0),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 15, color: AppColors.textMuted),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              message,
+              style: AppTypography.helper.copyWith(fontSize: 11.5),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

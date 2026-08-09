@@ -218,6 +218,10 @@ class OrdersRepository {
   Stream<List<OrderListItem>> watchByDate(String orderDate) =>
       _local.watchByDate(orderDate);
 
+  /// Las boletas que la lavandería todavía no devolvió, de cualquier fecha.
+  /// Es la lista de entregas de Caja (plan 0006 §7.1.1).
+  Stream<List<OrderListItem>> watchOpen() => _local.watchOpen();
+
   Stream<OrderDetail?> watchDetail(String id) => _local.watchDetail(id);
 
   Future<OrderDetail?> detail(String id) => _local.detail(id);
@@ -267,7 +271,9 @@ class OrdersRepository {
     PaymentDraft? payment,
   }) async {
     if (order.status?.canBeDelivered != true) {
-      return const Left(ValidationFailure('Solo un pedido listo se puede entregar'));
+      return const Left(
+        ValidationFailure('Esta boleta ya está cerrada: no se puede entregar de nuevo'),
+      );
     }
     if (payment != null && payment.amount > order.balance) {
       return const Left(ValidationFailure('El pago no puede ser mayor que el saldo'));

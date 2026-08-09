@@ -11,6 +11,7 @@ import '../../auth/ui/widgets/permission_gate.dart';
 import '../../customers/ui/widgets/customer_picker.dart';
 import '../../scan/models/scan.dart';
 import '../../scan/ui/scan_screen.dart';
+import '../../shell/ui/widgets/gradient_header.dart';
 import '../domain/order_capture.dart';
 import '../state/order_capture_controller.dart';
 import 'widgets/capture_section.dart';
@@ -176,7 +177,6 @@ class _OrderCaptureScreenState extends ConsumerState<OrderCaptureScreen> {
     final asyncState = ref.watch(
       orderCaptureControllerProvider(widget.orderId),
     );
-    final editing = asyncState.valueOrNull?.editing;
     final loaded = asyncState.valueOrNull;
     if (loaded != null) {
       _applyScan(loaded);
@@ -184,64 +184,194 @@ class _OrderCaptureScreenState extends ConsumerState<OrderCaptureScreen> {
     }
 
     return Scaffold(
-      backgroundColor: AppColors.background,
-      appBar: AppBar(
-        backgroundColor: AppColors.white,
-        surfaceTintColor: AppColors.white,
-        leading: IconButton(
-          onPressed: () => context.pop(),
-          icon: const Icon(Icons.arrow_back_rounded),
-          tooltip: 'Volver',
-        ),
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              editing == null ? 'Nueva boleta' : 'Corregir boleta',
-              style: AppTypography.h3.copyWith(
-                fontSize: 16,
-                fontWeight: FontWeight.w800,
+      backgroundColor: AppColors.gray50,
+      body: Column(
+        children: [
+          _Header(
+            state: loaded,
+            // El escaneo solo se ofrece en una boleta en blanco: corrigiendo no
+            // tiene sentido, y una que ya vino de una foto no se vuelve a leer.
+            canScan: loaded != null && !loaded.isEditing && !loaded.isFromScan,
+          ),
+          Expanded(
+            child: asyncState.when(
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (error, _) => Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: AppEmptyState(
+                    icon: Icons.error_outline_rounded,
+                    title: 'No se pudo abrir la boleta',
+                    message: '$error',
+                  ),
+                ),
+              ),
+              data: (state) => _Form(
+                state: state,
+                expanded: _expanded,
+                onToggle: _toggle,
+                booklet: _booklet,
+                nit: _nit,
+                weight: _weight,
+                observations: _observations,
+                discountAmount: _discountAmount,
+                discountDescription: _discountDescription,
+                advance: _advance,
+                reference: _reference,
+                onClear: _clearForm,
               ),
             ),
-            Text(
-              editing == null
-                  ? 'El No. diario se asigna al guardar'
-                  : '${editing.reference} · el No. y la fecha no cambian',
-              style: AppTypography.helper.copyWith(fontSize: 11),
-            ),
-          ],
-        ),
-      ),
-      body: asyncState.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (error, _) => Center(
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: AppEmptyState(
-              icon: Icons.error_outline_rounded,
-              title: 'No se pudo abrir la boleta',
-              message: '$error',
-            ),
           ),
-        ),
-        data: (state) => _Form(
-          state: state,
-          expanded: _expanded,
-          onToggle: _toggle,
-          booklet: _booklet,
-          nit: _nit,
-          weight: _weight,
-          observations: _observations,
-          discountAmount: _discountAmount,
-          discountDescription: _discountDescription,
-          advance: _advance,
-          reference: _reference,
-          onClear: _clearForm,
-        ),
+        ],
       ),
       bottomNavigationBar: asyncState.maybeWhen(
         data: (state) => _Footer(state: state, onSave: _save),
         orElse: () => null,
+      ),
+    );
+  }
+}
+
+/// La cabecera de la boleta: de dónde se vuelve, qué boleta es y el atajo al
+/// escaneo. Va sobre el gradiente de marca como el resto de las pantallas.
+class _Header extends ConsumerWidget {
+  const _Header({required this.state, required this.canScan});
+
+  final OrderCaptureState? state;
+  final bool canScan;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final editing = state?.editing;
+
+    return GradientHeader(
+      padding: const EdgeInsets.fromLTRB(14, 0, 14, 16),
+      child: Row(
+        children: [
+          _HeaderIconButton(
+            icon: Icons.chevron_left_rounded,
+            tooltip: 'Volver',
+            onPressed: () => context.pop(),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  editing == null
+                      ? 'Sin No. asignado'
+                      : '${editing.reference} · el No. y la fecha no cambian',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTypography.bodySm.copyWith(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.primary100,
+                  ),
+                ),
+                Text(
+                  editing == null ? 'Nueva boleta' : 'Corregir boleta',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTypography.h3.copyWith(
+                    fontSize: 19,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.white,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (canScan) ...[const SizedBox(width: 10), const _ScanChip()],
+        ],
+      ),
+    );
+  }
+}
+
+class _HeaderIconButton extends StatelessWidget {
+  const _HeaderIconButton({
+    required this.icon,
+    required this.tooltip,
+    required this.onPressed,
+  });
+
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final radius = BorderRadius.circular(11);
+
+    return Tooltip(
+      message: tooltip,
+      child: Material(
+        color: AppColors.white.withValues(alpha: 0.2),
+        borderRadius: radius,
+        child: InkWell(
+          onTap: onPressed,
+          borderRadius: radius,
+          child: SizedBox.square(
+            dimension: 34,
+            child: Icon(icon, size: 22, color: AppColors.white),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// La entrada al escaneo desde la boleta en blanco (§5.2).
+///
+/// Es online-only (D8), así que sin señal se muestra apagado y lo dice al
+/// tocarlo: esconderlo dejaría a quien lo busca creyendo que la app lo perdió.
+class _ScanChip extends ConsumerWidget {
+  const _ScanChip();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final online = ref.watch(connectivityChangesProvider).valueOrNull ?? true;
+    final radius = BorderRadius.circular(12);
+
+    return Material(
+      color: online ? AppColors.secondary500 : AppColors.white.withValues(alpha: 0.2),
+      borderRadius: radius,
+      child: InkWell(
+        onTap: () {
+          if (online) {
+            context.push(ScanScreen.path);
+            return;
+          }
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Escanear necesita señal. Capturá a mano mientras tanto.'),
+            ),
+          );
+        },
+        borderRadius: radius,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.document_scanner_outlined,
+                size: 16,
+                color: online ? const Color(0xFF06485F) : AppColors.white,
+              ),
+              const SizedBox(width: 6),
+              Text(
+                'Escanear',
+                style: AppTypography.button(
+                  fontSize: 12,
+                  color: online ? const Color(0xFF06485F) : AppColors.white,
+                ).copyWith(fontWeight: FontWeight.w800),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -257,6 +387,7 @@ class _Footer extends StatelessWidget {
   Widget build(BuildContext context) {
     final priced = state.priced;
     final blockers = state.blockers;
+    final charges = priced.charges.length;
 
     return AppSummaryBar(
       total: Fixed2.toDouble(priced.total),
@@ -272,7 +403,13 @@ class _Footer extends StatelessWidget {
             emphasis: true,
           ),
       ],
-      caption: '${state.totalPieces} pzas · ${priced.charges.length} cargos',
+      pills: [
+        AppSummaryPill('${state.totalPieces} pzas'),
+        AppSummaryPill(
+          '$charges ${charges == 1 ? 'cargo' : 'cargos'}',
+          tone: AppSummaryTone.secondary,
+        ),
+      ],
       actionLabel: state.isEditing ? 'Guardar cambios' : 'Guardar pedido',
       note: blockers.isEmpty ? null : blockers.first,
       noteIsWarning: blockers.isNotEmpty,
@@ -328,71 +465,6 @@ class _ScannedBanner extends StatelessWidget {
   }
 }
 
-/// La entrada al escaneo desde la boleta en blanco (§5.2).
-///
-/// Solo si hay señal: es online-only (D8) y un botón que solo puede fallar es
-/// peor que no tenerlo. La captura a mano sigue entera debajo.
-class _ScanEntry extends ConsumerWidget {
-  const _ScanEntry();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final online = ref.watch(connectivityChangesProvider).valueOrNull ?? true;
-
-    return Material(
-      color: online ? AppColors.primary50 : AppColors.gray100,
-      borderRadius: AppRadius.mdAll,
-      child: InkWell(
-        onTap: online ? () => context.push(ScanScreen.path) : null,
-        borderRadius: AppRadius.mdAll,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-          child: Row(
-            children: [
-              Icon(
-                Icons.document_scanner_outlined,
-                size: 20,
-                color: online ? AppColors.primary700 : AppColors.gray400,
-              ),
-              const SizedBox(width: 11),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Escanear la boleta',
-                      style: AppTypography.bodySm.copyWith(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
-                        color: online
-                            ? AppColors.primary700
-                            : AppColors.textSecondary,
-                      ),
-                    ),
-                    Text(
-                      online
-                          ? 'Tomale una foto y llegá con esto lleno.'
-                          : 'Necesita señal. Capturá a mano mientras tanto.',
-                      style: AppTypography.helper.copyWith(
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              if (online)
-                const Icon(
-                  Icons.chevron_right_rounded,
-                  color: AppColors.primary700,
-                ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 class _Form extends ConsumerWidget {
   const _Form({
     required this.state,
@@ -435,20 +507,18 @@ class _Form extends ConsumerWidget {
         if (state.isFromScan) ...[
           _ScannedBanner(reviewCount: state.scanReviewCount),
           const SizedBox(height: 10),
-        ] else if (!state.isEditing) ...[
-          const _ScanEntry(),
-          const SizedBox(height: 10),
         ],
         CaptureSection(
           step: 1,
           title: 'Encabezado',
           summary: _headerSummary(state),
+          accent: CaptureAccent.secondary,
           expanded: expanded.contains(1),
           onToggle: () => onToggle(1),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const CaptureLabel('FECHA DEL PEDIDO'),
+              const CaptureLabel('Fecha del pedido'),
               AppDateField(
                 value: state.orderDate,
                 today: businessDate(),
@@ -459,10 +529,9 @@ class _Form extends ConsumerWidget {
                 children: [
                   Expanded(
                     child: AppFormField(
-                      label: 'SERIE DE BOLETA',
+                      label: 'Serie boleta',
                       controller: booklet,
                       hintText: '10433',
-                      optional: true,
                       keyboardType: TextInputType.number,
                       onChanged: controller.setBookletSerial,
                     ),
@@ -470,10 +539,9 @@ class _Form extends ConsumerWidget {
                   const SizedBox(width: 10),
                   Expanded(
                     child: AppFormField(
-                      label: 'PESO (LBS)',
+                      label: 'Peso (lbs)',
                       controller: weight,
-                      hintText: '0.00',
-                      optional: true,
+                      hintText: '0',
                       keyboardType: const TextInputType.numberWithOptions(
                         decimal: true,
                       ),
@@ -484,21 +552,32 @@ class _Form extends ConsumerWidget {
                 ],
               ),
               const SizedBox(height: 12),
-              AppFormField(
-                label: 'NIT',
-                controller: nit,
-                hintText: '1234567-8',
-                optional: true,
-                helperText: 'Se prellena con el del cliente y se puede cambiar',
-                onChanged: controller.setNit,
-                suffix: _CfButton(
-                  onPressed: () {
-                    nit.text = 'CF';
-                    controller.setNit('CF');
-                  },
-                ),
+              const CaptureLabel('NIT'),
+              Row(
+                children: [
+                  Expanded(
+                    child: AppTextField(
+                      key: const ValueKey('nit-field'),
+                      controller: nit,
+                      hintText: 'CF',
+                      onChanged: controller.setNit,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  _CfButton(
+                    onPressed: () {
+                      nit.text = 'CF';
+                      controller.setNit('CF');
+                    },
+                  ),
+                ],
               ),
-              const SizedBox(height: 10),
+              const SizedBox(height: 6),
+              Text(
+                'Se prellena con el del cliente y se puede cambiar.',
+                style: AppTypography.helper.copyWith(fontSize: 11.5),
+              ),
+              const SizedBox(height: 8),
               Text(
                 'El peso queda ligado al cargo «Lavado por peso» de la sección 5.',
                 style: AppTypography.helper.copyWith(fontSize: 11.5),
@@ -547,11 +626,12 @@ class _Form extends ConsumerWidget {
           summary: state.observations.trim().isEmpty
               ? 'Sin observaciones'
               : state.observations.trim(),
+          accent: CaptureAccent.secondary,
           expanded: expanded.contains(4),
           onToggle: () => onToggle(4),
           child: AppTextField(
             controller: observations,
-            hintText: 'Lo que haya que recordar de este pedido',
+            hintText: 'Notas generales del pedido…',
             maxLines: 3,
             onChanged: controller.setObservations,
           ),
@@ -560,6 +640,7 @@ class _Form extends ConsumerWidget {
           step: 5,
           title: 'Servicios',
           summary: _serviceSummary(state),
+          accent: CaptureAccent.secondary,
           incomplete: priced.charges.isEmpty,
           expanded: expanded.contains(5),
           onToggle: () => onToggle(5),
@@ -599,7 +680,6 @@ class _Form extends ConsumerWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const CaptureLabel('PROMOCIONES VIGENTES'),
               PromotionsSection(
                 promotions: state.promotions.live,
                 lines: priced.charges,
@@ -614,15 +694,24 @@ class _Form extends ConsumerWidget {
                   padding: const EdgeInsets.only(top: 10),
                   child: PromotionIssue(message: issue),
                 ),
+              const Padding(
+                padding: EdgeInsets.only(top: 10),
+                child: CaptureHint(
+                  message: 'El servidor confirma el descuento al guardar.',
+                ),
+              ),
               PermissionGate(
                 anyOf: const [AppPermissions.ordersManualDiscount],
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     const SizedBox(height: 16),
-                    const CaptureLabel('DESCUENTO MANUAL'),
+                    const CaptureGroupLabel(
+                      'Descuento manual',
+                      accent: CaptureAccent.primary,
+                    ),
                     AppFormField(
-                      label: 'MONTO',
+                      label: 'Monto Q',
                       controller: discountAmount,
                       hintText: 'Q 0.00',
                       keyboardType: const TextInputType.numberWithOptions(
@@ -634,7 +723,7 @@ class _Form extends ConsumerWidget {
                     ),
                     const SizedBox(height: 12),
                     AppFormField(
-                      label: 'MOTIVO',
+                      label: 'Motivo',
                       controller: discountDescription,
                       hintText: 'Ej. cliente frecuente',
                       onChanged: (value) =>
@@ -666,10 +755,9 @@ class _Form extends ConsumerWidget {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 AppFormField(
-                  label: 'MONTO',
+                  label: 'Monto Q',
                   controller: advance,
                   hintText: 'Q 0.00',
-                  optional: true,
                   keyboardType: const TextInputType.numberWithOptions(
                     decimal: true,
                   ),
@@ -677,7 +765,7 @@ class _Form extends ConsumerWidget {
                   onChanged: (value) => controller.setAdvance(amount: value),
                 ),
                 const SizedBox(height: 12),
-                const CaptureLabel('MÉTODO'),
+                const CaptureLabel('Método'),
                 AppSegmented<PaymentMethod>(
                   value: state.paymentMethod,
                   options: const [
@@ -697,10 +785,9 @@ class _Form extends ConsumerWidget {
                 if (state.paymentMethod == PaymentMethod.transfer) ...[
                   const SizedBox(height: 12),
                   AppFormField(
-                    label: 'REFERENCIA',
+                    label: 'Referencia',
                     controller: reference,
-                    hintText: 'No. de la transferencia',
-                    optional: true,
+                    hintText: 'No. de boleta o referencia',
                     onChanged: (value) =>
                         controller.setAdvance(reference: value),
                   ),
@@ -716,14 +803,7 @@ class _Form extends ConsumerWidget {
         const SizedBox(height: 4),
         // Vaciar una corrección no tendría a dónde volver: dejaría la pantalla
         // en blanco pero seguiría apuntando al pedido. Para deshacer se sale.
-        if (!state.isEditing)
-          AppButton(
-            label: 'Limpiar boleta',
-            variant: AppButtonVariant.ghost,
-            icon: const Icon(Icons.restart_alt_rounded),
-            fullWidth: true,
-            onPressed: onClear,
-          ),
+        if (!state.isEditing) _ClearButton(onPressed: onClear),
       ],
     );
   }
@@ -801,6 +881,33 @@ class _PiecesCounter extends StatelessWidget {
   }
 }
 
+/// Vaciar la boleta se pinta en gris y no en magenta: es lo contrario de la
+/// acción principal, y un botón de marca al pie invitaría a tocarlo.
+class _ClearButton extends StatelessWidget {
+  const _ClearButton({required this.onPressed});
+
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: TextButton.icon(
+        onPressed: onPressed,
+        icon: const Icon(Icons.delete_outline_rounded, size: 16),
+        label: Text(
+          'Limpiar boleta',
+          style: AppTypography.button(fontSize: 12.5, color: AppColors.gray500)
+              .copyWith(fontWeight: FontWeight.w800),
+        ),
+        style: TextButton.styleFrom(
+          foregroundColor: AppColors.gray500,
+          overlayColor: AppColors.errorText,
+        ),
+      ),
+    );
+  }
+}
+
 /// Atajo al NIT de consumidor final, que es el que se teclea todo el día.
 class _CfButton extends StatelessWidget {
   const _CfButton({required this.onPressed});
@@ -809,20 +916,20 @@ class _CfButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final radius = BorderRadius.circular(12);
+
     return Material(
       color: AppColors.primary100,
-      borderRadius: BorderRadius.circular(9),
+      borderRadius: radius,
       child: InkWell(
         onTap: onPressed,
-        borderRadius: BorderRadius.circular(9),
+        borderRadius: radius,
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 6),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
           child: Text(
             'CF',
-            style: AppTypography.button(
-              fontSize: 12.5,
-              color: AppColors.primary700,
-            ),
+            style: AppTypography.button(fontSize: 13, color: AppColors.primary700)
+                .copyWith(fontWeight: FontWeight.w800),
           ),
         ),
       ),

@@ -366,7 +366,7 @@ void main() {
     await seedCatalog();
     await open(tester, null);
 
-    expect(find.text('Escanear la boleta'), findsOneWidget);
+    expect(find.text('Escanear'), findsOneWidget);
     expect(find.textContaining('Boleta escaneada'), findsNothing);
   });
 }

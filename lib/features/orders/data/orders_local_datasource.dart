@@ -11,6 +11,13 @@ import '../models/order.dart';
 
 part 'orders_local_datasource.g.dart';
 
+/// Lo que cuenta como boleta abierta: la ropa sigue en la lavandería.
+final List<String> _openStatuses = [
+  OrderStatus.received.wire,
+  OrderStatus.inProgress.wire,
+  OrderStatus.ready.wire,
+];
+
 /// Lectura y escritura de pedidos en la BD local. I/O puro sobre Drift.
 class OrdersLocalDataSource {
   const OrdersLocalDataSource(this._database);
@@ -299,6 +306,44 @@ class OrdersLocalDataSource {
   /// todo lo demás evita. Un día tiene decenas de pedidos; la aritmética sobra.
   Stream<List<OrderListItem>> watchByDate(String orderDate) {
     final orders = _database.orderEntries;
+    return _watchList(
+      where: orders.orderDate.equals(orderDate),
+      // Descendente: lo último que entró es lo que se está buscando. El
+      // correlativo provisional es negativo, así que los pedidos que aún no
+      // suben quedan al final; se ordena también por hora para que no se
+      // mezclen entre sí.
+      orderBy: [
+        OrderingTerm.desc(orders.dailyNumber),
+        OrderingTerm.desc(orders.createdAt),
+      ],
+    );
+  }
+
+  /// Las boletas abiertas: las que la lavandería todavía no devolvió.
+  ///
+  /// **Sin fecha, a propósito.** Una boleta que entró el lunes se entrega el
+  /// miércoles, y atar esta lista al día de la caja escondería justo las que
+  /// llevan más tiempo esperando. Tampoco filtra por `listo` (plan 0001 D13):
+  /// abierta es todo lo que no está entregado ni anulado, porque los estados de
+  /// en medio nadie los marca.
+  Stream<List<OrderListItem>> watchOpen() {
+    final orders = _database.orderEntries;
+    return _watchList(
+      where: orders.status.isIn(_openStatuses),
+      // Lo más viejo primero: es la ropa que lleva más tiempo ocupando espacio,
+      // y lo primero que busca el repaso del cierre.
+      orderBy: [
+        OrderingTerm.asc(orders.orderDate),
+        OrderingTerm.asc(orders.dailyNumber),
+      ],
+    );
+  }
+
+  Stream<List<OrderListItem>> _watchList({
+    required Expression<bool> where,
+    required List<OrderingTerm> orderBy,
+  }) {
+    final orders = _database.orderEntries;
     final customers = _database.customerEntries;
     final payments = _database.orderPaymentEntries;
 
@@ -310,15 +355,8 @@ class OrdersLocalDataSource {
               payments.orderId.equalsExp(orders.id) & payments.deletedAt.isNull(),
             ),
           ])
-          ..where(orders.deletedAt.isNull() & orders.orderDate.equals(orderDate))
-          // Descendente: lo último que entró es lo que se está buscando. El
-          // correlativo provisional es negativo, así que los pedidos que aún no
-          // suben quedan al final; se ordena también por hora para que no se
-          // mezclen entre sí.
-          ..orderBy([
-            OrderingTerm.desc(orders.dailyNumber),
-            OrderingTerm.desc(orders.createdAt),
-          ]);
+          ..where(orders.deletedAt.isNull() & where)
+          ..orderBy(orderBy);
 
     return query.watch().map((rows) {
       final byId = <String, OrderEntry>{};

@@ -36,7 +36,6 @@ class GarmentsSection extends StatefulWidget {
 class _GarmentsSectionState extends State<GarmentsSection> {
   String _query = '';
   bool _showAll = false;
-  final Set<String> _noteOpen = {};
 
   List<GarmentType> get _visible {
     final needle = normalizeForSearch(_query);
@@ -74,15 +73,10 @@ class _GarmentsSectionState extends State<GarmentsSection> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        DecoratedBox(
-          decoration: BoxDecoration(
-            border: Border.all(color: AppColors.border),
-            borderRadius: BorderRadius.circular(14),
-          ),
-          child: AppSearchField(
-            hintText: 'Buscar tipo de prenda…',
-            onChanged: (value) => setState(() => _query = value),
-          ),
+        AppSearchField(
+          hintText: 'Buscar prenda…',
+          backgroundColor: AppColors.gray100,
+          onChanged: (value) => setState(() => _query = value),
         ),
         const SizedBox(height: 10),
         if (visible.isEmpty)
@@ -98,23 +92,21 @@ class _GarmentsSectionState extends State<GarmentsSection> {
             type: type,
             quantity: widget.quantities[type.id] ?? 0,
             note: widget.notes[type.id] ?? '',
-            noteOpen: _noteOpen.contains(type.id),
-            onToggleNote: () => setState(() {
-              if (!_noteOpen.remove(type.id)) _noteOpen.add(type.id);
-            }),
             onQuantityChanged: (value) => widget.onQuantityChanged(type.id, value),
             onNoteChanged: (value) => widget.onNoteChanged(type.id, value),
           ),
         if (_query.isEmpty && widget.garmentTypes.length > GarmentsSection.visibleByDefault)
-          Align(
-            alignment: Alignment.centerLeft,
-            child: AppButton(
-              label: _showAll
-                  ? 'Ver solo las más usadas'
-                  : 'Ver los ${widget.garmentTypes.length} tipos de prenda',
-              variant: AppButtonVariant.ghost,
-              size: AppButtonSize.sm,
-              onPressed: () => setState(() => _showAll = !_showAll),
+          Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: Center(
+              child: AppButton(
+                label: _showAll
+                    ? 'Ver solo las más usadas'
+                    : 'Ver los ${widget.garmentTypes.length} tipos de prenda',
+                variant: AppButtonVariant.ghost,
+                size: AppButtonSize.sm,
+                onPressed: () => setState(() => _showAll = !_showAll),
+              ),
             ),
           ),
       ],
@@ -128,8 +120,6 @@ class _GarmentRow extends StatefulWidget {
     required this.type,
     required this.quantity,
     required this.note,
-    required this.noteOpen,
-    required this.onToggleNote,
     required this.onQuantityChanged,
     required this.onNoteChanged,
   });
@@ -137,8 +127,6 @@ class _GarmentRow extends StatefulWidget {
   final GarmentType type;
   final int quantity;
   final String note;
-  final bool noteOpen;
-  final VoidCallback onToggleNote;
   final ValueChanged<int> onQuantityChanged;
   final ValueChanged<String> onNoteChanged;
 
@@ -163,19 +151,20 @@ class _GarmentRowState extends State<_GarmentRow> {
     final type = widget.type;
     final quantity = widget.quantity;
     final counted = quantity > 0;
-    final hasNote = widget.note.trim().isNotEmpty;
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 6),
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-      decoration: BoxDecoration(
-        color: counted ? AppColors.primary50 : AppColors.gray50,
-        borderRadius: BorderRadius.circular(13),
-        border: Border.all(color: counted ? AppColors.primary100 : AppColors.gray100),
-      ),
-      child: Column(
-        children: [
-          Row(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Container(
+          padding: const EdgeInsets.fromLTRB(12, 7, 9, 7),
+          decoration: BoxDecoration(
+            color: counted ? AppColors.primary50 : AppColors.gray50,
+            borderRadius: BorderRadius.circular(13),
+            border: Border.all(
+              color: counted ? AppColors.primary100 : AppColors.gray100,
+            ),
+          ),
+          child: Row(
             children: [
               Expanded(
                 child: Text(
@@ -185,22 +174,11 @@ class _GarmentRowState extends State<_GarmentRow> {
                   style: AppTypography.bodySm.copyWith(
                     fontSize: 13.5,
                     fontWeight: FontWeight.w700,
-                    color: counted ? AppColors.primary700 : AppColors.textPrimary,
+                    color: AppColors.gray800,
                   ),
                 ),
               ),
-              IconButton(
-                onPressed: widget.onToggleNote,
-                tooltip: 'Nota de esta prenda',
-                visualDensity: VisualDensity.compact,
-                icon: Icon(
-                  hasNote
-                      ? Icons.sticky_note_2_rounded
-                      : Icons.sticky_note_2_outlined,
-                  size: 18,
-                  color: hasNote ? AppColors.primary500 : AppColors.gray300,
-                ),
-              ),
+              const SizedBox(width: 10),
               AppStepper(
                 value: quantity,
                 size: AppStepperSize.md,
@@ -208,16 +186,51 @@ class _GarmentRowState extends State<_GarmentRow> {
               ),
             ],
           ),
-          if (widget.noteOpen || hasNote)
-            Padding(
-              padding: const EdgeInsets.only(top: 6),
-              child: AppTextField(
-                controller: _note,
-                hintText: 'Ej. camisa blanca manchada',
-                onChanged: widget.onNoteChanged,
-              ),
+        ),
+        // La nota aparece sola en cuanto la prenda entra al pedido: es donde va
+        // "camisa blanca manchada", y esconderla tras un botón hace que nadie la
+        // escriba.
+        if (counted)
+          Padding(
+            padding: const EdgeInsets.only(top: 6),
+            child: _NoteField(controller: _note, onChanged: widget.onNoteChanged),
+          ),
+        const SizedBox(height: 6),
+      ],
+    );
+  }
+}
+
+/// La nota de una prenda: borde punteado magenta sobre fondo rosa, para que se
+/// lea como un apunte al margen y no como otro campo del formulario.
+class _NoteField extends StatelessWidget {
+  const _NoteField({required this.controller, required this.onChanged});
+
+  final TextEditingController controller;
+  final ValueChanged<String> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return AppDashedBox(
+      radius: 11,
+      backgroundColor: AppColors.primary50,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 11),
+        child: TextField(
+          controller: controller,
+          onChanged: onChanged,
+          style: AppTypography.bodySm.copyWith(fontSize: 12),
+          decoration: InputDecoration(
+            isDense: true,
+            border: InputBorder.none,
+            hintText: 'Nota (ej. camisa blanca manchada)',
+            hintStyle: AppTypography.bodySm.copyWith(
+              fontSize: 12,
+              color: AppColors.gray400,
             ),
-        ],
+            contentPadding: const EdgeInsets.symmetric(vertical: 10),
+          ),
+        ),
       ),
     );
   }

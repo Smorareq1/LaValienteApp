@@ -150,6 +150,47 @@ void main() {
         );
   }
 
+  /// Una boleta abierta con una prenda y sin anticipo: lo que la lista de
+  /// entregas de Caja tiene que encontrar. Se queda en `received` a propósito.
+  Future<void> seedOpenOrder({
+    required String id,
+    required String serial,
+    required String name,
+  }) async {
+    await database
+        .into(database.customerEntries)
+        .insert(
+          CustomerEntriesCompanion.insert(id: 'cliente-$id', fullName: name),
+        );
+    await database
+        .into(database.orderEntries)
+        .insert(
+          OrderEntriesCompanion.insert(
+            id: id,
+            orderDate: today,
+            dailyNumber: serial.hashCode.abs() % 90 + 1,
+            bookletSerial: Value(serial),
+            customerId: 'cliente-$id',
+            totalPieces: const Value(3),
+            status: 'received',
+            subtotal: '80.00',
+            discountTotal: '0.00',
+            total: '80.00',
+            receivedById: 'u1',
+          ),
+        );
+    await database
+        .into(database.orderGarmentEntries)
+        .insert(
+          OrderGarmentEntriesCompanion.insert(
+            id: 'prenda-$id',
+            orderId: id,
+            garmentTypeId: 'gt-camisa',
+            quantity: 3,
+          ),
+        );
+  }
+
   Future<void> seedClosure() {
     return database
         .into(database.dailyClosureEntries)
@@ -280,6 +321,73 @@ void main() {
     });
   });
 
+  group('entregas y cobros', () {
+    cashTest('las boletas abiertas se listan con su saldo', (tester) async {
+      await seedOpenOrder(id: 'p-1', serial: 'B-000144', name: 'Sonia Pérez');
+      await openCash(tester);
+
+      expect(find.text('ENTREGAS Y COBROS'), findsOneWidget);
+      expect(find.text('1 sin entregar'), findsOneWidget);
+      expect(find.text('B-000144'), findsOneWidget);
+      expect(find.text('Sonia Pérez'), findsOneWidget);
+      // Nadie la pasó por «en proceso» ni «lista» y aun así está acá: es el
+      // caso normal (plan 0001 D13).
+      expect(find.text('saldo'), findsOneWidget);
+    });
+
+    cashTest('marcar una boleta ofrece registrarla, y hacerlo la entrega', (
+      tester,
+    ) async {
+      await seedOpenOrder(id: 'p-1', serial: 'B-000144', name: 'Sonia Pérez');
+      await openCash(tester);
+
+      await tester.tap(find.text('Sonia Pérez'));
+      await tester.pumpAndSettle();
+      expect(find.text('1 boleta marcada · Q80.00'), findsOneWidget);
+
+      await tester.tap(find.widgetWithText(AppButton, 'Registrar'));
+      await tester.pumpAndSettle();
+      expect(find.text('Registrar 1 entrega'), findsOneWidget);
+      expect(find.text('Entra a caja'), findsOneWidget);
+
+      await tester.tap(find.widgetWithText(AppButton, 'Entregar'));
+      await tester.pumpAndSettle();
+
+      // La boleta se cerró y su cobro es un ingreso del día.
+      final order = await (database.select(
+        database.orderEntries,
+      )..where((row) => row.id.equals('p-1'))).getSingle();
+      expect(order.status, 'delivered');
+      expect(order.deliveredById, 'u1');
+
+      final payments = await database.select(database.orderPaymentEntries).get();
+      expect(payments.single.amount, '80.00');
+      expect(payments.single.isAdvance, isFalse);
+    });
+
+    cashTest('el buscador filtra por número de boleta', (tester) async {
+      await seedOpenOrder(id: 'p-1', serial: 'B-000144', name: 'Sonia Pérez');
+      await seedOpenOrder(id: 'p-2', serial: 'B-000139', name: 'Lucía Marroquín');
+      await openCash(tester);
+
+      await tester.enterText(find.byType(AppSearchField), '000139');
+      // El campo tiene retardo: sin dejarlo pasar la lista no se ha rehecho.
+      await tester.pump(const Duration(milliseconds: 300));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Lucía Marroquín'), findsOneWidget);
+      expect(find.text('Sonia Pérez'), findsNothing);
+    });
+
+    cashTest('un día cerrado ya no ofrece registrar entregas', (tester) async {
+      await seedOpenOrder(id: 'p-1', serial: 'B-000144', name: 'Sonia Pérez');
+      await seedClosure();
+      await openCash(tester);
+
+      expect(find.text('ENTREGAS Y COBROS'), findsNothing);
+    });
+  });
+
   group('permisos', () {
     cashTest('sin permiso de venta el botón de venta no se dibuja', (tester) async {
       await openCash(
@@ -292,6 +400,18 @@ void main() {
 
       expect(find.text('Gasto'), findsOneWidget);
       expect(find.text('Venta'), findsNothing);
+    });
+
+    cashTest('sin permiso de entrega el bloque de entregas no se dibuja', (
+      tester,
+    ) async {
+      await seedOpenOrder(id: 'p-1', serial: 'B-000144', name: 'Sonia Pérez');
+      await openCash(
+        tester,
+        permissions: const [AppPermissions.expensesRead],
+      );
+
+      expect(find.text('ENTREGAS Y COBROS'), findsNothing);
     });
   });
 }

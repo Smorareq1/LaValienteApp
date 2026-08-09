@@ -1,4 +1,3 @@
-import 'package:design_system/design_system.dart';
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -362,12 +361,13 @@ void main() {
     await addOne(tester, 'Camisa');
     await addOne(tester, 'Camisa');
     await addOne(tester, 'Toalla grande');
-    expect(find.text('3 pzas'), findsOneWidget);
+    // El contador de la sección 3 y la pastilla del footer dicen lo mismo.
+    expect(find.text('3 pzas'), findsNWidgets(2));
 
     await addOne(tester, 'Tina grande');
     // Una tina grande a Q30.00: la línea lo dice y el footer también.
     expect(find.text('1 × Q30.00 = Q30.00'), findsOneWidget);
-    expect(find.text('3 pzas · 1 cargos'), findsOneWidget);
+    expect(find.text('1 cargo'), findsOneWidget);
 
     await addOne(tester, 'Tina grande');
     expect(find.text('2 × Q30.00 = Q60.00'), findsOneWidget);
@@ -407,10 +407,7 @@ void main() {
     await tester.pumpAndSettle();
 
     final nitField = find.descendant(
-      of: find.ancestor(
-        of: find.text('Se prellena con el del cliente y se puede cambiar'),
-        matching: find.byType(AppFormField),
-      ),
+      of: find.byKey(const ValueKey('nit-field')),
       matching: find.byType(TextField),
     );
     expect(tester.widget<TextField>(nitField).controller?.text, '1234567-8');

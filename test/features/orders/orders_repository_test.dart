@@ -87,8 +87,10 @@ OrderCapture _capture({PaymentDraft? advance, String orderDate = '2026-08-03'}) 
   );
 }
 
-/// Lleva el pedido de `recibido` a `listo`, que es lo que hace falta antes de
-/// poder entregarlo.
+/// Lleva el pedido de `recibido` a `listo` recorriendo la cadena.
+///
+/// Entregar **no** lo exige (plan 0001 D13); esto existe para las pruebas que
+/// comprueban que la cadena sigue funcionando para quien quiera usarla.
 Future<OrderDetail?> _advance(OrdersRepository repository, OrderDetail order) async {
   await repository.changeStatus(order, OrderStatus.inProgress);
   final inProgress = (await repository.detail(order.id))!;
@@ -453,9 +455,30 @@ void main() {
       expect(payment['is_advance'], isFalse);
     });
 
-    test('solo se entrega un pedido listo', () async {
+    test('se entrega una boleta que nunca salió de recibido', () async {
+      // El día normal (plan 0001 D13): nadie la pasó por «en proceso» ni
+      // «lista», y aun así se entrega y se cobra al cierre.
       final order = await saved();
 
+      final result = await repository.deliver(
+        order,
+        delivered: {for (final line in order.garments) line.id: line.quantity},
+        actorId: 'usuario-1',
+        payment: const PaymentDraft(amount: 7500),
+      );
+      expect(result.isRight(), isTrue);
+
+      final updated = (await repository.detail(order.id))!;
+      expect(updated.status, OrderStatus.delivered);
+      expect(updated.paid, 7500);
+    });
+
+    test('una boleta ya entregada no se entrega de nuevo', () async {
+      var order = await saved();
+      await repository.deliver(order, delivered: const {}, actorId: 'usuario-1');
+      order = (await repository.detail(order.id))!;
+
+      final before = (await operations()).length;
       final result = await repository.deliver(
         order,
         delivered: const {},
@@ -463,7 +486,8 @@ void main() {
       );
 
       expect(result.isLeft(), isTrue);
-      expect((await repository.detail(order.id))!.status, OrderStatus.received);
+      // Y no queda una segunda operación que el servidor tendría que rechazar.
+      expect(await operations(), hasLength(before));
     });
 
     test('anular guarda el motivo y deja el dinero cobrado en su sitio', () async {

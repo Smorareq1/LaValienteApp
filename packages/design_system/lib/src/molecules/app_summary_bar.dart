@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../atoms/app_money_text.dart';
 import '../tokens/app_colors.dart';
+import '../tokens/app_radius.dart';
 import '../tokens/app_typography.dart';
 
 /// Una cifra secundaria de la barra: subtotal, descuento, saldo.
@@ -16,12 +17,32 @@ class AppSummaryLine {
   final bool emphasis;
 }
 
+/// De qué habla una pastilla del resumen.
+enum AppSummaryTone {
+  /// Lo que el cliente trae: piezas, unidades. Magenta.
+  primary,
+
+  /// Lo que se le hace: cargos, servicios. Cian.
+  secondary,
+}
+
+/// El recuento pequeño que acompaña al total ("12 pzas", "4 cargos").
+class AppSummaryPill {
+  const AppSummaryPill(this.label, {this.tone = AppSummaryTone.primary});
+
+  final String label;
+  final AppSummaryTone tone;
+}
+
 /// Footer fijo con el total y la acción principal.
 ///
 /// Es el "resumen de la boleta" del plan 0002 §3.8: vive pegado abajo, se
 /// recalcula con cada cambio y **no se va con el scroll**. El total es la
 /// pregunta que el cliente hace de pie frente al mostrador, así que la respuesta
 /// no puede estar a tres deslizadas de distancia.
+///
+/// La acción ocupa todo el ancho debajo de la cifra y no a su lado: es el único
+/// botón de la pantalla y no tiene con quién competir por el espacio.
 class AppSummaryBar extends StatelessWidget {
   const AppSummaryBar({
     super.key,
@@ -31,6 +52,7 @@ class AppSummaryBar extends StatelessWidget {
     this.totalLabel = 'TOTAL',
     this.lines = const [],
     this.caption,
+    this.pills = const [],
     this.note,
     this.noteIsWarning = false,
     this.busy = false,
@@ -42,8 +64,11 @@ class AppSummaryBar extends StatelessWidget {
   /// Cifras de arriba (subtotal, descuento). Vacío deja solo el total.
   final List<AppSummaryLine> lines;
 
-  /// Texto pequeño junto al total ("12 pzas · 4 cargos").
+  /// Texto pequeño bajo el total, cuando el recuento no cabe en pastillas.
   final String? caption;
+
+  /// Recuentos a la derecha del total. Tienen prioridad sobre [caption].
+  final List<AppSummaryPill> pills;
 
   /// Aviso bajo el botón. En rojo si [noteIsWarning].
   final String? note;
@@ -66,66 +91,43 @@ class AppSummaryBar extends StatelessWidget {
         border: Border(top: BorderSide(color: AppColors.border)),
         boxShadow: [
           BoxShadow(
-            color: Color(0x14000000),
-            blurRadius: 18,
-            offset: Offset(0, -6),
+            color: Color(0x1F16181D),
+            blurRadius: 30,
+            spreadRadius: -18,
+            offset: Offset(0, -12),
           ),
         ],
       ),
       child: SafeArea(
         top: false,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+          padding: const EdgeInsets.fromLTRB(14, 11, 14, 12),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              if (lines.isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 6),
-                  child: Row(
-                    children: [
-                      for (final line in lines)
-                        Padding(
-                          padding: const EdgeInsets.only(right: 14),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(
-                                '${line.label} ',
-                                style: AppTypography.helper.copyWith(fontSize: 11.5),
-                              ),
-                              AppMoneyText(
-                                line.amount,
-                                size: AppMoneySize.sm,
-                                color: line.emphasis
-                                    ? AppColors.primary600
-                                    : AppColors.gray600,
-                                decimalColor: AppColors.gray400,
-                              ),
-                            ],
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
               Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  // La cifra manda sobre el botón: en una pantalla angosta se
-                  // recorta el texto de la acción antes que el total, que es lo
-                  // que el cliente está mirando.
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Text(
-                          totalLabel,
-                          style: AppTypography.caption.copyWith(fontSize: 10.5),
+                        if (lines.isNotEmpty) _Lines(lines: lines),
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.baseline,
+                          textBaseline: TextBaseline.alphabetic,
+                          children: [
+                            Text(
+                              totalLabel,
+                              style: AppTypography.caption.copyWith(fontSize: 10.5),
+                            ),
+                            const SizedBox(width: 6),
+                            Flexible(child: AppMoneyText(total, size: AppMoneySize.hero)),
+                          ],
                         ),
-                        AppMoneyText(total, size: AppMoneySize.hero),
-                        if (caption != null)
+                        if (pills.isEmpty && caption != null)
                           Text(
                             caption!,
                             maxLines: 1,
@@ -135,31 +137,128 @@ class AppSummaryBar extends StatelessWidget {
                       ],
                     ),
                   ),
-                  const SizedBox(width: 10),
-                  Flexible(
-                    child: _ActionButton(
-                      label: actionLabel,
-                      enabled: enabled,
-                      busy: busy,
-                      onTap: onAction,
+                  if (pills.isNotEmpty) ...[
+                    const SizedBox(width: 10),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        for (final pill in pills)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 4),
+                            child: _Pill(pill: pill),
+                          ),
+                      ],
                     ),
-                  ),
+                  ],
                 ],
+              ),
+              const SizedBox(height: 9),
+              _ActionButton(
+                label: actionLabel,
+                enabled: enabled,
+                busy: busy,
+                onTap: onAction,
               ),
               if (note != null)
                 Padding(
                   padding: const EdgeInsets.only(top: 8),
-                  child: Text(
-                    note!,
-                    textAlign: TextAlign.center,
-                    style: AppTypography.helper.copyWith(
-                      fontSize: 11.5,
-                      color: noteIsWarning ? AppColors.warningText : AppColors.textMuted,
-                    ),
+                  child: Row(
+                    children: [
+                      if (noteIsWarning) ...[
+                        const Icon(
+                          Icons.error_outline_rounded,
+                          size: 15,
+                          color: AppColors.errorText,
+                        ),
+                        const SizedBox(width: 7),
+                      ],
+                      Expanded(
+                        child: Text(
+                          note!,
+                          style: AppTypography.bodySm.copyWith(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w700,
+                            color: noteIsWarning
+                                ? AppColors.errorText
+                                : AppColors.textMuted,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _Lines extends StatelessWidget {
+  const _Lines({required this.lines});
+
+  final List<AppSummaryLine> lines;
+
+  @override
+  Widget build(BuildContext context) {
+    // Wrap y no Row: en un teléfono angosto el descuento se va al renglón de
+    // abajo en vez de recortarse, que es la cifra que nadie querría no ver.
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 1),
+      child: Wrap(
+        spacing: 10,
+        children: [
+          for (final line in lines)
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  '${line.label} ',
+                  style: AppTypography.bodySm.copyWith(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: line.emphasis ? AppColors.primary700 : AppColors.gray500,
+                  ),
+                ),
+                AppMoneyText(
+                  line.amount,
+                  size: AppMoneySize.sm,
+                  color: line.emphasis ? AppColors.primary700 : AppColors.gray500,
+                  decimalColor: line.emphasis
+                      ? AppColors.primary300
+                      : AppColors.gray400,
+                ),
+              ],
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _Pill extends StatelessWidget {
+  const _Pill({required this.pill});
+
+  final AppSummaryPill pill;
+
+  @override
+  Widget build(BuildContext context) {
+    final (background, foreground) = switch (pill.tone) {
+      AppSummaryTone.primary => (AppColors.primary100, AppColors.primary700),
+      AppSummaryTone.secondary => (AppColors.secondary100, AppColors.secondary700),
+    };
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
+      decoration: BoxDecoration(color: background, borderRadius: AppRadius.fullAll),
+      child: Text(
+        pill.label,
+        style: AppTypography.bodySm.copyWith(
+          fontSize: 10.5,
+          fontWeight: FontWeight.w800,
+          color: foreground,
         ),
       ),
     );
@@ -186,26 +285,27 @@ class _ActionButton extends StatelessWidget {
     // qué falta.
     return Material(
       color: enabled ? AppColors.primary500 : AppColors.primary300,
-      borderRadius: BorderRadius.circular(15),
+      borderRadius: BorderRadius.circular(14),
       child: InkWell(
         onTap: enabled ? onTap : null,
-        borderRadius: BorderRadius.circular(15),
+        borderRadius: BorderRadius.circular(14),
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 15),
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
           child: Row(
-            mainAxisSize: MainAxisSize.min,
+            mainAxisSize: MainAxisSize.max,
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
               if (busy)
                 const SizedBox.square(
-                  dimension: 16,
+                  dimension: 18,
                   child: CircularProgressIndicator(
                     strokeWidth: 2,
                     valueColor: AlwaysStoppedAnimation(AppColors.white),
                   ),
                 )
               else
-                const Icon(Icons.check_rounded, size: 18, color: AppColors.white),
-              const SizedBox(width: 8),
+                const Icon(Icons.check_rounded, size: 19, color: AppColors.white),
+              const SizedBox(width: 9),
               Flexible(
                 child: Text(
                   label,

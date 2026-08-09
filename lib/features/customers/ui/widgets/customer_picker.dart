@@ -72,15 +72,50 @@ class _CustomerPickerState extends ConsumerState<CustomerPicker> {
         const SizedBox(height: 10),
         PermissionGate(
           anyOf: const [AppPermissions.customersCreate],
-          child: AppButton(
-            label: 'Cliente nuevo',
-            variant: AppButtonVariant.outline,
-            icon: const Icon(Icons.person_add_alt_1_outlined),
-            fullWidth: true,
-            onPressed: _createCustomer,
-          ),
+          child: _NewCustomerButton(onPressed: _createCustomer),
         ),
       ],
+    );
+  }
+}
+
+/// Dar de alta a alguien va en punteado: todavía no existe, y el contorno
+/// abierto lo dice mejor que un botón macizo al lado de los resultados.
+class _NewCustomerButton extends StatelessWidget {
+  const _NewCustomerButton({required this.onPressed});
+
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return AppDashedBox(
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(12),
+        child: InkWell(
+          onTap: onPressed,
+          borderRadius: BorderRadius.circular(12),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 11),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.add_rounded, size: 17, color: AppColors.primary500),
+                const SizedBox(width: 7),
+                Flexible(
+                  child: Text(
+                    'Cliente nuevo',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppTypography.button(fontSize: 13, color: AppColors.primary500)
+                        .copyWith(fontWeight: FontWeight.w800),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
@@ -143,7 +178,7 @@ class _CustomerRow extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
           child: Row(
             children: [
-              CustomerInitials(name: customer.fullName, size: 32),
+              CustomerInitials(name: customer.fullName, size: 34),
               const SizedBox(width: 10),
               Expanded(
                 child: Column(
@@ -191,7 +226,7 @@ class _SelectedCustomer extends StatelessWidget {
       ),
       child: Row(
         children: [
-          CustomerInitials(name: customer.fullName, size: 38),
+          CustomerInitials(name: customer.fullName, size: 40),
           const SizedBox(width: 11),
           Expanded(
             child: Column(

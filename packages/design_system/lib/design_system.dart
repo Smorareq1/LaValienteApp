@@ -17,6 +17,7 @@ export 'src/atoms/app_avatar.dart';
 export 'src/atoms/app_badge.dart';
 export 'src/atoms/app_button.dart';
 export 'src/atoms/app_chip.dart';
+export 'src/atoms/app_dashed_box.dart';
 export 'src/atoms/app_date_field.dart';
 export 'src/atoms/app_money_text.dart';
 export 'src/atoms/app_search_field.dart';

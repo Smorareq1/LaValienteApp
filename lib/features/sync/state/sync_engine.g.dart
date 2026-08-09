@@ -6,7 +6,7 @@ part of 'sync_engine.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$syncEngineHash() => r'ac03a8ef57724e24b08fce1e1906447f0ab28162';
+String _$syncEngineHash() => r'3f795c9a828c58c45368e3072ce3e02c9a335fd5';
 
 /// Decide **cuándo** sincronizar. El *cómo* vive en [SyncRepository].
 ///

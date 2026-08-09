@@ -503,7 +503,8 @@ void main() {
       final id = await seedOrder(advance: const PaymentDraft(amount: 3000));
       await openOrders(tester);
 
-      // Se lleva a `listo`, que es lo único que se puede entregar.
+      // Se recorre la cadena, que sigue existiendo aunque entregar ya no la
+      // exija (plan 0001 D13).
       var order = (await orders.detail(id))!;
       await orders.changeStatus(order, OrderStatus.inProgress);
       order = (await orders.detail(id))!;
@@ -545,9 +546,10 @@ void main() {
       expect(find.text('Corregir boleta'), findsOneWidget);
       expect(find.textContaining('el No. y la fecha no cambian'), findsOneWidget);
       expect(find.text('Guardar cambios'), findsOneWidget);
-      // Y con lo que la boleta ya decía.
+      // Y con lo que la boleta ya decía: el contador de la sección 3 y la
+      // pastilla del footer.
       expect(find.text('Ana Pérez'), findsWidgets);
-      expect(find.text('3 pzas'), findsOneWidget);
+      expect(find.text('3 pzas'), findsNWidgets(2));
     });
 
     orderTest('corregir reemplaza las líneas y vuelve al detalle', (tester) async {
@@ -564,7 +566,7 @@ void main() {
       final row = find.ancestor(of: find.text('Camisa'), matching: find.byType(Row)).first;
       await tester.tap(find.descendant(of: row, matching: find.byIcon(Icons.add_rounded)));
       await tester.pumpAndSettle();
-      expect(find.text('4 pzas'), findsOneWidget);
+      expect(find.text('4 pzas'), findsNWidgets(2));
 
       await tester.tap(find.text('Guardar cambios'));
       await tester.pumpAndSettle();

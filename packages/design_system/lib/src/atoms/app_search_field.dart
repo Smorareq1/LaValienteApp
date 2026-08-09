@@ -21,6 +21,7 @@ class AppSearchField extends StatefulWidget {
     this.hintText = 'Buscar…',
     this.debounce = const Duration(milliseconds: 250),
     this.autofocus = false,
+    this.backgroundColor = AppColors.white,
   });
 
   /// Recibe el texto ya reposado.
@@ -32,6 +33,10 @@ class AppSearchField extends StatefulWidget {
   final String hintText;
   final Duration debounce;
   final bool autofocus;
+
+  /// El fondo de la caja. Gris cuando el campo va dentro de una tarjeta blanca
+  /// —así se lee como un control y no como otro renglón del formulario.
+  final Color backgroundColor;
 
   @override
   State<AppSearchField> createState() => _AppSearchFieldState();
@@ -76,7 +81,7 @@ class _AppSearchFieldState extends State<AppSearchField> {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: AppColors.white,
+        color: widget.backgroundColor,
         borderRadius: BorderRadius.circular(14),
       ),
       padding: const EdgeInsets.symmetric(horizontal: 13),

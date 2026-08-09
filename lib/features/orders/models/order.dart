@@ -29,9 +29,12 @@ enum OrderStatus {
     return null;
   }
 
-  /// El paso natural hacia adelante, el que la pantalla ofrece como acción
-  /// principal. `null` al final de la cadena: de `listo` se sale entregando, y
-  /// eso tiene pantalla propia porque hay que conciliar prendas y cobrar.
+  /// El paso natural hacia adelante, si alguien quiere darlo.
+  ///
+  /// La cadena es **opcional** (plan 0001 D13): existe para saber qué hay en
+  /// lavado, pero nadie está obligado a recorrerla y entregar no la exige. De
+  /// ahí que esto no sea la acción principal de ninguna pantalla — el pedido se
+  /// cierra al entregarlo, y eso se registra desde Caja.
   OrderStatus? get forwardStep => switch (this) {
     OrderStatus.received => OrderStatus.inProgress,
     OrderStatus.inProgress => OrderStatus.ready,
@@ -57,10 +60,18 @@ enum OrderStatus {
     if (backStep != null) backStep!,
   ];
 
-  bool get canBeDelivered => this == OrderStatus.ready;
+  /// Se entrega desde cualquier estado vivo (`DELIVERABLE_FROM` del backend,
+  /// plan 0001 D13). Exigir `listo` antes obligaría a dar dos toques que en el
+  /// mostrador nadie da: la entrega se registra al cierre, contra boletas que
+  /// nunca salieron de `recibido`.
+  bool get canBeDelivered => !isClosed;
 
   bool get canBeCancelled =>
       this == OrderStatus.received || this == OrderStatus.inProgress;
+
+  /// Una boleta abierta: la lavandería todavía tiene la ropa. Es lo que llena
+  /// la lista de entregas de Caja (plan 0006 §7.1.1).
+  bool get isOpen => !isClosed;
 
   /// Un pedido cerrado ya no acepta nada; uno entregado sí sigue aceptando
   /// pagos, que es como se salda un fiado.
