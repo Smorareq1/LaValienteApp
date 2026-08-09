@@ -17,6 +17,7 @@ import 'package:la_valiente/features/orders/data/orders_repository.dart';
 import 'package:la_valiente/features/orders/domain/order_capture.dart';
 import 'package:la_valiente/features/orders/domain/order_pricing.dart';
 import 'package:la_valiente/features/orders/models/order.dart';
+import 'package:la_valiente/features/orders/ui/widgets/order_progress.dart';
 import 'package:la_valiente/features/sync/data/sync_local_datasource.dart';
 import 'package:la_valiente/features/sync/data/sync_remote_datasource.dart';
 import 'package:la_valiente/features/sync/data/sync_repository.dart';
@@ -132,7 +133,7 @@ void main() {
 
   /// Deja un pedido del día de hoy en la BD local, como si se acabara de
   /// capturar en el mostrador.
-  Future<String> seedOrder({PaymentDraft? advance}) async {
+  Future<String> seedOrder({PaymentDraft? advance, bool crowded = false}) async {
     await database
         .into(database.customerEntries)
         .insert(
@@ -140,16 +141,35 @@ void main() {
             id: 'cliente-1',
             fullName: 'Ana Pérez',
             phone: const Value('5555-1234'),
+            nit: const Value('1234567-8'),
           ),
         );
-    await database
-        .into(database.garmentTypeEntries)
-        .insert(GarmentTypeEntriesCompanion.insert(id: 'gt-camisa', name: 'Camisa'));
+    for (final (id, name) in const [
+      ('gt-camisa', 'Camisa'),
+      ('gt-pantalon', 'Pantalón de vestir'),
+      ('gt-toalla', 'Toalla grande de baño'),
+    ]) {
+      if (!crowded && id != 'gt-camisa') continue;
+      await database
+          .into(database.garmentTypeEntries)
+          .insert(GarmentTypeEntriesCompanion.insert(id: id, name: name));
+    }
 
     final capture = OrderCapture(
       orderDate: isoDate(businessDate()),
       customerId: 'cliente-1',
-      garments: const [GarmentDraft(garmentTypeId: 'gt-camisa', quantity: 3)],
+      bookletSerial: crowded ? '10432' : null,
+      weightLbs: crowded ? 2250 : null,
+      observations: crowded
+          ? 'Camisa blanca manchada de tinta. El cliente pasa el jueves temprano.'
+          : null,
+      garments: [
+        const GarmentDraft(garmentTypeId: 'gt-camisa', quantity: 3),
+        if (crowded) ...const [
+          GarmentDraft(garmentTypeId: 'gt-pantalon', quantity: 4),
+          GarmentDraft(garmentTypeId: 'gt-toalla', quantity: 5),
+        ],
+      ],
       charges: const [ChargeDraft(serviceCode: 'wash_tub', optionCode: 'G')],
       advancePayment: advance,
     );
@@ -165,6 +185,29 @@ void main() {
     );
     expect(result.isRight(), isTrue);
     return (await database.select(database.orderEntries).get()).single.id;
+  }
+
+  /// Un acta que cierra [date], como la que baja del feed cuando alguien cerró
+  /// el día desde otro dispositivo.
+  Future<void> seedClosure(String date) async {
+    await database
+        .into(database.dailyClosureEntries)
+        .insert(
+          DailyClosureEntriesCompanion.insert(
+            id: 'acta-$date',
+            closeDate: date,
+            ordersIncome: '0.00',
+            suppliesIncome: '0.00',
+            expensesTotal: '0.00',
+            netTotal: '0.00',
+            cashIncome: '0.00',
+            transferIncome: '0.00',
+            cashExpenses: '0.00',
+            transferExpenses: '0.00',
+            closedById: 'u1',
+            closedAt: DateTime.now(),
+          ),
+        );
   }
 
   /// El catálogo en la BD local, que es de donde lo lee la pantalla de captura
@@ -206,8 +249,9 @@ void main() {
   Future<void> openOrders(
     WidgetTester tester, {
     List<String> permissions = const [AppPermissions.all],
+    Size size = const Size(400, 2200),
   }) async {
-    tester.view.physicalSize = const Size(400, 2200);
+    tester.view.physicalSize = size;
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
 
@@ -281,16 +325,39 @@ void main() {
 
       expect(find.text('P-1'), findsOneWidget);
       expect(find.text('Camisa'), findsOneWidget);
-      expect(find.text('Saldo pendiente'), findsOneWidget);
+      // En la tarjeta de pagos y otra vez en la barra de abajo, que es donde se
+      // lee justo antes de tocar el botón.
+      expect(find.text('Saldo pendiente'), findsNWidgets(2));
 
-      await tester.tap(find.text('Marcar en proceso'));
+      await tester.tap(find.text('Pasar a proceso'));
       await tester.pumpAndSettle();
 
       expect(find.text('En proceso'), findsWidgets);
       // Listo todavía no: la cadena no se salta, y por eso ahora aparece el
       // paso siguiente y el de volver atrás.
       expect(find.text('Marcar listo'), findsOneWidget);
-      expect(find.text('Volver a recibido'), findsOneWidget);
+      expect(find.text('Regresar a recibido'), findsOneWidget);
+    });
+
+    orderTest('el avance se ve en los cuatro pasos', (tester) async {
+      final id = await seedOrder();
+      await openOrders(tester);
+
+      await tester.tap(find.text('Ana Pérez'));
+      await tester.pumpAndSettle();
+      expect(find.byType(OrderProgress), findsOneWidget);
+
+      // Anulado se sale de la cadena, así que no hay avance que dibujar.
+      await orders.cancel(
+        (await orders.detail(id))!,
+        reason: 'boleta duplicada',
+        actorId: 'u1',
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byType(OrderProgress), findsNothing);
+      expect(find.text('Pedido anulado'), findsOneWidget);
+      expect(find.text('Motivo: boleta duplicada'), findsOneWidget);
     });
 
     orderTest('registrar un pago baja el saldo en la misma pantalla', (tester) async {
@@ -300,7 +367,7 @@ void main() {
       await tester.tap(find.text('Ana Pérez'));
       await tester.pumpAndSettle();
 
-      await tester.tap(find.text('Registrar pago'));
+      await tester.tap(find.text('Cobrar'));
       await tester.pumpAndSettle();
 
       // El monto arranca en el saldo entero.
@@ -310,9 +377,9 @@ void main() {
       await tester.tap(find.text('Registrar'));
       await tester.pumpAndSettle();
 
-      expect(find.text('Saldado'), findsOneWidget);
+      expect(find.text('Pagado por completo'), findsNWidgets(2));
       // Sin saldo ya no se ofrece cobrar de nuevo.
-      expect(find.text('Registrar pago'), findsNothing);
+      expect(find.text('Cobrar'), findsNothing);
     });
 
     orderTest('cobrar de más se rechaza antes de mandarlo', (tester) async {
@@ -321,7 +388,7 @@ void main() {
 
       await tester.tap(find.text('Ana Pérez'));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Registrar pago'));
+      await tester.tap(find.text('Cobrar'));
       await tester.pumpAndSettle();
 
       await tester.enterText(
@@ -348,10 +415,10 @@ void main() {
       await tester.tap(find.text('Ana Pérez'));
       await tester.pumpAndSettle();
 
-      await tester.tap(find.text('Anular pedido'));
+      await tester.tap(find.text('Anular'));
       await tester.pumpAndSettle();
 
-      await tester.tap(find.text('Anular pedido').last);
+      await tester.tap(find.text('Anular pedido'));
       await tester.pumpAndSettle();
       expect(find.text('Escribí por qué se anula'), findsOneWidget);
 
@@ -365,11 +432,11 @@ void main() {
         ),
         'El cliente se arrepintió',
       );
-      await tester.tap(find.text('Anular pedido').last);
+      await tester.tap(find.text('Anular pedido'));
       await tester.pumpAndSettle();
 
-      expect(find.text('Anulado: El cliente se arrepintió'), findsOneWidget);
-      expect(find.text('Anular pedido'), findsNothing);
+      expect(find.text('Motivo: El cliente se arrepintió'), findsOneWidget);
+      expect(find.text('Anular'), findsNothing);
     });
 
     orderTest('sin permiso de anular, la acción no está', (tester) async {
@@ -386,9 +453,48 @@ void main() {
       await tester.tap(find.text('Ana Pérez'));
       await tester.pumpAndSettle();
 
-      expect(find.text('Marcar en proceso'), findsOneWidget);
-      expect(find.text('Anular pedido'), findsNothing);
-      expect(find.text('Registrar pago'), findsNothing);
+      expect(find.text('Pasar a proceso'), findsOneWidget);
+      expect(find.text('Anular'), findsNothing);
+      expect(find.text('Cobrar'), findsNothing);
+    });
+
+    /// El detalle es la pantalla más cargada de la app y las otras pruebas la
+    /// miran en una ventana de 2200 px de alto, donde nada se aprieta. Esta la
+    /// abre en un teléfono de verdad y con la boleta llena —boleta, peso, tres
+    /// tipos de prenda, observaciones, anticipo— porque los desbordes salen
+    /// cuando el contenido compite por el ancho, no cuando sobra sitio.
+    orderTest('entra en un teléfono con la boleta llena', (tester) async {
+      await seedOrder(crowded: true, advance: const PaymentDraft(amount: 1000));
+      await openOrders(tester, size: const Size(390, 844));
+
+      await tester.tap(find.text('Ana Pérez'));
+      await tester.pumpAndSettle();
+
+      expect(tester.takeException(), isNull);
+      expect(find.text('10432'), findsOneWidget);
+      expect(find.text('22.50 lbs'), findsOneWidget);
+      expect(find.text('12'), findsOneWidget);
+      expect(find.text('5555-1234 · NIT 1234567-8'), findsOneWidget);
+      expect(find.text('Pantalón de vestir'), findsOneWidget);
+    });
+
+    orderTest('con el día cerrado se bloquea el dinero, no el trabajo', (tester) async {
+      await seedCatalog();
+      await seedOrder();
+      await seedClosure(isoDate(businessDate()));
+      await openOrders(tester);
+
+      await tester.tap(find.text('Ana Pérez'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Día cerrado · este pedido ya no se puede editar'), findsOneWidget);
+      // Corregir, anular y cobrar tocan la hoja del día, así que se van.
+      expect(find.text('Editar'), findsNothing);
+      expect(find.text('Anular'), findsNothing);
+      expect(find.text('Cobrar'), findsNothing);
+      // Mover la ropa por el taller no mueve dinero de ningún día, y el
+      // servidor tampoco lo bloquea: el botón sigue.
+      expect(find.text('Pasar a proceso'), findsOneWidget);
     });
   });
 
@@ -406,7 +512,7 @@ void main() {
 
       await tester.tap(find.text('Ana Pérez'));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Entregar'));
+      await tester.tap(find.text('Entregar pedido'));
       await tester.pumpAndSettle();
 
       expect(find.text('Se recibieron 3'), findsOneWidget);

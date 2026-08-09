@@ -211,6 +211,16 @@ class _StatusCard extends StatelessWidget {
         '${status.pendingCount} esperando subir',
         'Se suben solas al recuperar conexión. Nada se pierde mientras tanto.',
       ),
+      // El mensaje del fallo va tal cual y no traducido a "revisá tu red": el
+      // motor ya distingue no alcanzar al servidor de que el servidor no
+      // conteste, y aplanar las dos cosas manda a revisar el wifi a quien tiene
+      // el wifi perfecto.
+      SyncState.failed => (
+        Icons.cloud_off_rounded,
+        AppStatusTone.error,
+        'La última sincronización falló',
+        status.failureMessage ?? 'El ciclo no pudo terminar.',
+      ),
       SyncState.needsReview => (
         Icons.error_outline_rounded,
         AppStatusTone.error,
@@ -245,6 +255,7 @@ class _StatusCard extends StatelessWidget {
                   SyncState.synced => 'Al día',
                   SyncState.syncing => 'En curso',
                   SyncState.pending => 'Pendiente',
+                  SyncState.failed => 'Falló',
                   SyncState.needsReview => 'Revisar',
                 },
                 tone: tone,

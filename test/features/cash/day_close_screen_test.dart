@@ -1,4 +1,5 @@
 import 'package:design_system/design_system.dart';
+import 'package:dio/dio.dart';
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -44,7 +45,7 @@ class _IdleSyncEngine extends SyncEngine {
   SyncEngineState build() => const SyncEngineState();
 
   @override
-  Future<void> sync() async {}
+  Future<void> sync({String reason = 'a mano'}) async {}
 }
 
 class _IdleSyncStatus extends SyncStatusController {
@@ -52,14 +53,33 @@ class _IdleSyncStatus extends SyncStatusController {
   SyncStatus build() => const SyncStatus.synced();
 }
 
+/// Lo que lanza Dio cuando de verdad no se alcanza al servidor.
+///
+/// Un `Exception` pelado no sirve para esta prueba: la pantalla ya no dice
+/// "necesita conexión" ante cualquier fallo —decirlo mandaba a revisar el wifi
+/// a quien tenía el wifi perfecto— sino que hace caso al tipo, y un error
+/// genérico es justamente el caso que ahora se muestra distinto.
+DioException _noNetwork() => DioException(
+  requestOptions: RequestOptions(path: '/daily-close/preview'),
+  type: DioExceptionType.connectionError,
+);
+
 /// El servidor del cierre, sin red: el acta es online-only y lo que se prueba
 /// aquí es qué hace la pantalla con lo que le respondan.
 class _FakeDailyClose implements DailyCloseRemoteDataSource {
-  _FakeDailyClose({required this.today, this.closure, this.fails = false});
+  _FakeDailyClose({
+    required this.today,
+    this.closure,
+    this.fails = false,
+    DioException? failure,
+  }) : failure = failure ?? _noNetwork();
 
   DayClosePreview today;
   DayClosureRecord? closure;
   bool fails;
+
+  /// Con qué falla cuando [fails]. Por defecto, falta de red.
+  final DioException failure;
 
   int closeCalls = 0;
   int reopenCalls = 0;
@@ -68,7 +88,7 @@ class _FakeDailyClose implements DailyCloseRemoteDataSource {
 
   @override
   Future<DayClosePreview> preview(String date) async {
-    if (fails) throw Exception('sin red');
+    if (fails) throw failure;
     return today;
   }
 
@@ -77,7 +97,7 @@ class _FakeDailyClose implements DailyCloseRemoteDataSource {
     required String from,
     required String to,
   }) async {
-    if (fails) throw Exception('sin red');
+    if (fails) throw failure;
     final record = closure;
     return record == null ? const [] : [record];
   }
@@ -360,6 +380,30 @@ void main() {
       );
 
       expect(find.text('El cierre necesita conexión'), findsOneWidget);
+      expect(find.widgetWithText(AppButton, 'Reintentar'), findsOneWidget);
+    });
+
+    // Un servidor que se queda callado no es un teléfono sin señal, y la
+    // pantalla llegó a decir lo mismo en los dos casos. Con el túnel de
+    // desarrollo colgándose una de cada cinco peticiones, ese mensaje mandaba a
+    // revisar una red que estaba perfecta.
+    closeTest('un servidor que no contesta no se confunde con falta de red', (
+      tester,
+    ) async {
+      await openClose(
+        tester,
+        server: _FakeDailyClose(
+          today: _preview(date: today),
+          fails: true,
+          failure: DioException(
+            requestOptions: RequestOptions(path: '/daily-close/preview'),
+            type: DioExceptionType.receiveTimeout,
+          ),
+        ),
+      );
+
+      expect(find.text('El servidor no contestó a tiempo'), findsOneWidget);
+      expect(find.text('El cierre necesita conexión'), findsNothing);
       expect(find.widgetWithText(AppButton, 'Reintentar'), findsOneWidget);
     });
   });

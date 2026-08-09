@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/widgets.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
+import '../../../core/diagnostics/app_log.dart';
 import '../../../core/network/connectivity.dart';
 import '../../auth/state/auth_controller.dart';
 import '../data/sync_repository.dart';
@@ -86,28 +87,45 @@ class SyncEngine extends _$SyncEngine {
       return const SyncEngineState();
     }
 
-    _periodic = Timer.periodic(kSyncPeriodicInterval, (_) => unawaited(sync()));
-    _lifecycle = AppLifecycleListener(onResume: () => unawaited(sync()));
+    _periodic = Timer.periodic(
+      kSyncPeriodicInterval,
+      (_) => unawaited(sync(reason: 'periódico')),
+    );
+    _lifecycle = AppLifecycleListener(
+      onResume: () => unawaited(sync(reason: 'app al frente')),
+    );
     _outbox = ref.read(syncRepositoryProvider).watchPendingCount().listen(_onOutboxChanged);
 
     // La suscripción muere con el provider, así que no hace falta guardarla.
     ref.listen(connectivityChangesProvider, (_, next) {
-      if (next.valueOrNull ?? false) unawaited(sync());
+      if (next.valueOrNull ?? false) unawaited(sync(reason: 'volvió la red'));
     });
 
-    scheduleMicrotask(() => unawaited(sync()));
+    scheduleMicrotask(() => unawaited(sync(reason: 'arranque')));
     return const SyncEngineState();
   }
 
   /// Pide un ciclo. Si ya hay uno corriendo, devuelve ese mismo.
-  Future<void> sync() {
-    return _inFlight ??= _runCycle().whenComplete(() => _inFlight = null);
+  ///
+  /// [reason] solo va al log. Está porque los cuatro disparadores del §5 se ven
+  /// idénticos desde afuera, y saber cuál mandó el ciclo es la diferencia entre
+  /// "sincroniza cuando toca" y "algo lo está llamando cada dos segundos".
+  Future<void> sync({String reason = 'a mano'}) {
+    if (_inFlight != null) {
+      appLog('sync', 'ciclo pedido ($reason) — ya hay uno en vuelo, se engancha');
+      return _inFlight!;
+    }
+    appLog('sync', 'ciclo arranca ($reason)');
+    return _inFlight = _runCycle().whenComplete(() => _inFlight = null);
   }
 
   /// Pide un ciclo tras una captura local, agrupando ráfagas de ediciones.
   void syncSoon() {
     _debounce?.cancel();
-    _debounce = Timer(kSyncMutationDebounce, () => unawaited(sync()));
+    _debounce = Timer(
+      kSyncMutationDebounce,
+      () => unawaited(sync(reason: 'captura local')),
+    );
   }
 
   /// El outbox cambió de tamaño: si creció, alguien acaba de capturar algo.
@@ -148,6 +166,11 @@ class SyncEngine extends _$SyncEngine {
 
       switch (progress.phase) {
         case SyncPhase.done:
+          appLog(
+            'sync',
+            'ciclo ok · subidas ${progress.pushed} · bajadas ${progress.pulled} '
+            '· quedan ${progress.remaining}',
+          );
           _backoff.reset();
           state = state.copyWith(
             lastSyncedAt: DateTime.now(),
@@ -155,6 +178,11 @@ class SyncEngine extends _$SyncEngine {
             clearNextAttempt: true,
           );
         case SyncPhase.failed:
+          appLog(
+            'sync',
+            'ciclo FALLÓ · ${progress.failure?.runtimeType} '
+            '· ${progress.failure?.message}',
+          );
           _scheduleRetry();
         case SyncPhase.wiped:
           // El dispositivo dejó de estar autorizado: se apagan los
@@ -169,8 +197,9 @@ class SyncEngine extends _$SyncEngine {
 
   void _scheduleRetry() {
     final delay = _backoff.nextDelay();
+    appLog('sync', 'reintento en ${delay.inSeconds}s (fallo ${_backoff.failures})');
     _retry?.cancel();
-    _retry = Timer(delay, () => unawaited(sync()));
+    _retry = Timer(delay, () => unawaited(sync(reason: 'reintento')));
     state = state.copyWith(
       nextAttemptAt: DateTime.now().add(delay),
       consecutiveFailures: _backoff.failures,

@@ -29,14 +29,33 @@ enum OrderStatus {
     return null;
   }
 
+  /// El paso natural hacia adelante, el que la pantalla ofrece como acción
+  /// principal. `null` al final de la cadena: de `listo` se sale entregando, y
+  /// eso tiene pantalla propia porque hay que conciliar prendas y cobrar.
+  OrderStatus? get forwardStep => switch (this) {
+    OrderStatus.received => OrderStatus.inProgress,
+    OrderStatus.inProgress => OrderStatus.ready,
+    OrderStatus.ready || OrderStatus.delivered || OrderStatus.cancelled => null,
+  };
+
+  /// El paso de vuelta, que existe para deshacer un toque equivocado.
+  ///
+  /// Va aparte de [forwardStep] y no mezclado con él porque no son la misma
+  /// clase de acción: uno mueve el trabajo y el otro corrige un error, y
+  /// ponerlos como dos botones iguales invita justo al toque que se quería
+  /// deshacer.
+  OrderStatus? get backStep => switch (this) {
+    OrderStatus.inProgress => OrderStatus.received,
+    OrderStatus.ready => OrderStatus.inProgress,
+    OrderStatus.received || OrderStatus.delivered || OrderStatus.cancelled => null,
+  };
+
   /// A dónde puede pasar con el botón de avanzar. Entregar y anular no salen de
   /// aquí: cada uno tiene su pantalla porque necesita datos propios.
-  List<OrderStatus> get nextSteps => switch (this) {
-    OrderStatus.received => const [OrderStatus.inProgress],
-    OrderStatus.inProgress => const [OrderStatus.ready, OrderStatus.received],
-    OrderStatus.ready => const [OrderStatus.inProgress],
-    OrderStatus.delivered || OrderStatus.cancelled => const [],
-  };
+  List<OrderStatus> get nextSteps => [
+    if (forwardStep != null) forwardStep!,
+    if (backStep != null) backStep!,
+  ];
 
   bool get canBeDelivered => this == OrderStatus.ready;
 

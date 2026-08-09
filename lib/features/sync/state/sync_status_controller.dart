@@ -3,6 +3,7 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../data/sync_repository.dart';
 import '../models/sync_details.dart';
+import '../models/sync_progress.dart';
 import '../models/sync_status.dart';
 import 'sync_engine.dart';
 
@@ -36,7 +37,8 @@ Stream<int> reviewQueueCount(Ref ref) {
 ///
 /// Compone tres fuentes: la fase del motor, el outbox y la cola de revisión.
 /// El orden de prioridad no es estético — lo que necesita una decisión humana
-/// tapa a lo que solo necesita esperar.
+/// tapa a lo que solo necesita esperar, y un motor caído tapa a una cola que
+/// espera, porque una cola que espera avanza sola y un motor caído no.
 @Riverpod(keepAlive: true)
 class SyncStatusController extends _$SyncStatusController {
   @override
@@ -44,12 +46,17 @@ class SyncStatusController extends _$SyncStatusController {
     final engine = ref.watch(syncEngineProvider);
     final pending = ref.watch(pendingOperationsCountProvider).valueOrNull ?? 0;
     final review = ref.watch(reviewQueueCountProvider).valueOrNull ?? 0;
+    final failure = engine.progress.phase == SyncPhase.failed
+        ? engine.progress.failure
+        : null;
 
     final SyncState state;
     if (review > 0) {
       state = SyncState.needsReview;
     } else if (engine.progress.isRunning) {
       state = SyncState.syncing;
+    } else if (failure != null) {
+      state = SyncState.failed;
     } else if (pending > 0) {
       state = SyncState.pending;
     } else {
@@ -61,6 +68,7 @@ class SyncStatusController extends _$SyncStatusController {
       pendingCount: pending,
       reviewCount: review,
       lastSyncedAt: engine.lastSyncedAt,
+      failureMessage: failure?.message,
     );
   }
 

@@ -63,9 +63,29 @@ dev_dependencies:
   drift_dev: ^2.28.0
   integration_test:
     sdk: flutter
+  flutter_launcher_icons: ^0.14.4
 
 flutter:
   uses-material-design: true
 
+  # assets/icons/ no entra aquí a propósito: son la fuente del icono de
+  # lanzador, los consume flutter_launcher_icons al generar, y no hacen falta
+  # dentro del paquete en tiempo de ejecución.
   assets:
     - assets/images/
+
+# Icono de lanzador. El arte lo genera tool/build_icons.py; esto solo reparte
+# los PNG de 1024 en las densidades de Android y iOS.
+#
+#   dart run flutter_launcher_icons
+#
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "assets/icons/app_icon.png"
+  # Las dos capas del icono adaptativo de Android. El fondo va a sangre y el
+  # frente lleva la marca dentro del círculo seguro de 66dp sobre 108dp.
+  adaptive_icon_background: "assets/icons/app_icon_background.png"
+  adaptive_icon_foreground: "assets/icons/app_icon_foreground.png"
+  # iOS rechaza iconos con canal alfa; el nuestro trae la sombra en PNG.
+  remove_alpha_ios: true

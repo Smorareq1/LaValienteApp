@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/auth/app_permissions.dart';
+import '../../../core/errors/app_failure.dart';
 import '../../../core/money/fixed2.dart';
 import '../../../core/time/business_date.dart';
 import '../../auth/ui/widgets/permission_gate.dart';
@@ -66,7 +67,8 @@ class _DayCloseScreenState extends ConsumerState<DayCloseScreen> {
                 onClose: () => _close(value),
                 onReopen: () => _reopen(value),
               ),
-              AsyncError() => _OfflineState(
+              AsyncError(:final error) => _LoadFailed(
+                failure: AppFailure.fromException(error),
                 onRetry: () => ref.invalidate(dayCloseControllerProvider(_date)),
               ),
               _ => const Center(child: CircularProgressIndicator()),
@@ -556,27 +558,52 @@ class _ReadOnlyNote extends StatelessWidget {
   }
 }
 
+/// Por qué no se pudo armar el acta.
+///
 /// Sin red no hay acta: es la única pantalla de dinero que no se puede resolver
-/// con el espejo local, y decirlo es mejor que mostrar cifras a medias.
-class _OfflineState extends StatelessWidget {
-  const _OfflineState({required this.onRetry});
+/// con el espejo local, y decirlo es mejor que mostrar cifras a medias. Pero
+/// **no todo fallo es falta de red**, y durante un tiempo esta pantalla dijo
+/// "necesita conexión" ante cualquier cosa: un permiso que faltaba, un 500 del
+/// servidor o un túnel que se colgó salían todos como si el teléfono estuviera
+/// sin señal, y mandaban a revisar un wifi que estaba perfecto. El fallo ya
+/// viene tipado desde la capa de red; aquí solo se le hace caso.
+class _LoadFailed extends StatelessWidget {
+  const _LoadFailed({required this.failure, required this.onRetry});
 
+  final AppFailure failure;
   final VoidCallback onRetry;
 
   @override
   Widget build(BuildContext context) {
+    final (title, message) = switch (failure) {
+      NetworkFailure() => (
+        'El cierre necesita conexión',
+        'El acta suma lo que cobraron todos los dispositivos, y este solo '
+            'conoce lo suyo. La Caja sigue funcionando sin señal.',
+      ),
+      // Se alcanzó al servidor y se quedó callado. El teléfono no tiene nada
+      // que arreglar, así que no se le pide que revise nada.
+      TimeoutFailure() => (
+        'El servidor no contestó a tiempo',
+        'La conexión llegó pero el servidor tardó demasiado. No es el '
+            'teléfono: hay que volver a intentar en un momento.',
+      ),
+      AuthFailure(:final message) => ('No se pudo abrir el cierre', message),
+      _ => ('No se pudo leer el cierre', failure.message),
+    };
+
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(24),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const AppEmptyState(
-              icon: Icons.cloud_off_rounded,
-              title: 'El cierre necesita conexión',
-              message:
-                  'El acta suma lo que cobraron todos los dispositivos, y este '
-                  'solo conoce lo suyo. La Caja sigue funcionando sin señal.',
+            AppEmptyState(
+              icon: failure is NetworkFailure
+                  ? Icons.cloud_off_rounded
+                  : Icons.error_outline_rounded,
+              title: title,
+              message: message,
             ),
             const SizedBox(height: 14),
             AppButton(

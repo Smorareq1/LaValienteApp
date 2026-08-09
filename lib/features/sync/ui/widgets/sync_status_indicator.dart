@@ -34,6 +34,15 @@ class SyncStatusIndicator extends ConsumerWidget {
           foreground: AppColors.warningText,
           tooltip: '${status.pendingCount} operaciones pendientes de sincronizar',
         ),
+      // Sin número: lo que hay que mirar no es cuántas esperan sino que el
+      // motor se cayó, y una cifra al lado invitaría a leerlo como una cola que
+      // avanza sola.
+      SyncState.failed => _RoundIndicator(
+          icon: Icons.cloud_off_rounded,
+          tooltip: status.failureMessage ?? 'La última sincronización falló',
+          background: AppColors.errorBg,
+          foreground: AppColors.errorText,
+        ),
       SyncState.needsReview => _CountIndicator(
           icon: Icons.error_outline_rounded,
           count: status.reviewCount,
@@ -52,10 +61,20 @@ class SyncStatusIndicator extends ConsumerWidget {
 }
 
 class _RoundIndicator extends StatelessWidget {
-  const _RoundIndicator({required this.icon, required this.tooltip});
+  const _RoundIndicator({
+    required this.icon,
+    required this.tooltip,
+    this.background,
+    this.foreground,
+  });
 
   final IconData icon;
   final String tooltip;
+
+  /// Sin colores va el tratamiento de siempre: blanco translúcido sobre el
+  /// degradado del AppBar. Los estados que hay que notar traen los suyos.
+  final Color? background;
+  final Color? foreground;
 
   @override
   Widget build(BuildContext context) {
@@ -66,10 +85,10 @@ class _RoundIndicator extends StatelessWidget {
         height: 34,
         alignment: Alignment.center,
         decoration: BoxDecoration(
-          color: AppColors.white.withValues(alpha: 0.18),
+          color: background ?? AppColors.white.withValues(alpha: 0.18),
           borderRadius: AppRadius.fullAll,
         ),
-        child: Icon(icon, size: 16, color: AppColors.white),
+        child: Icon(icon, size: 16, color: foreground ?? AppColors.white),
       ),
     );
   }

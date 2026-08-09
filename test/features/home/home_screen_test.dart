@@ -40,7 +40,7 @@ class _IdleSyncEngine extends SyncEngine {
   SyncEngineState build() => const SyncEngineState();
 
   @override
-  Future<void> sync() async {}
+  Future<void> sync({String reason = 'a mano'}) async {}
 }
 
 class _IdleSyncStatus extends SyncStatusController {

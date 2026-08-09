@@ -11,6 +11,7 @@ import '../../shell/ui/widgets/gradient_header.dart';
 import '../models/order.dart';
 import '../state/orders_controller.dart';
 import 'order_capture_screen.dart';
+import 'widgets/order_status_badge.dart';
 
 /// Lista de pedidos del día (Plan 0006 §5.1).
 ///
@@ -321,7 +322,7 @@ class _OrderCard extends StatelessWidget {
         children: [
           AppMoneyText(order.totalAsDouble, size: AppMoneySize.md),
           const SizedBox(height: 4),
-          _StatusPill(status: order.status),
+          OrderStatusPill(status: order.status),
           if (order.hasBalance) ...[
             const SizedBox(height: 4),
             AppStatusBadge(
@@ -333,35 +334,6 @@ class _OrderCard extends StatelessWidget {
         ],
       ),
       onTap: () => context.push('${OrdersScreen.path}/${order.id}'),
-    );
-  }
-}
-
-/// Píldora del estado, con el color que ya usa el resto de la app.
-class _StatusPill extends StatelessWidget {
-  const _StatusPill({required this.status});
-
-  final OrderStatus? status;
-
-  @override
-  Widget build(BuildContext context) {
-    if (status == null) {
-      return const AppStatusBadge(
-        label: 'Estado desconocido',
-        size: AppStatusBadgeSize.sm,
-      );
-    }
-
-    return AppStatusBadge(
-      label: status!.label,
-      size: AppStatusBadgeSize.sm,
-      tone: switch (status!) {
-        OrderStatus.received => AppStatusTone.info,
-        OrderStatus.inProgress => AppStatusTone.warning,
-        OrderStatus.ready => AppStatusTone.success,
-        OrderStatus.delivered => AppStatusTone.brand,
-        OrderStatus.cancelled => AppStatusTone.neutral,
-      },
     );
   }
 }
