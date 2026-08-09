@@ -2,6 +2,7 @@ import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:la_valiente/core/database/app_database.dart';
 import 'package:la_valiente/core/errors/app_failure.dart';
+import 'package:la_valiente/core/auth/offline_credential.dart';
 import 'package:la_valiente/core/storage/secure_storage_service.dart';
 import 'package:la_valiente/features/sync/data/entity_mirror.dart';
 import 'package:la_valiente/features/sync/data/sync_local_datasource.dart';
@@ -103,6 +104,20 @@ class _FakeStorage implements SecureStorageService {
 
   @override
   Future<void> clearSession() async => sessionCleared = true;
+
+  // La sesión guardada para abrir sin señal no le importa a estas pruebas: lo
+  // que se ejercita es el ciclo de sync, no la entrada.
+  @override
+  Future<void> saveUser(Map<String, dynamic> user) async {}
+
+  @override
+  Future<Map<String, dynamic>?> readUser() async => null;
+
+  @override
+  Future<void> saveOfflineCredential(OfflineCredential credential) async {}
+
+  @override
+  Future<OfflineCredential?> readOfflineCredential() async => null;
 
   @override
   Future<String?> readAccessToken() async => null;

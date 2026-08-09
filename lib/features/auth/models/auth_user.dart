@@ -23,6 +23,19 @@ class AuthUser {
             (json['denied_permissions'] as List<dynamic>? ?? const []).cast<String>(),
       );
 
+  /// Mismas llaves que [AuthUser.fromJson]: lo que se guarda para poder abrir
+  /// la app sin señal tiene que volver a leerse con el mismo lector que usa la
+  /// respuesta del servidor, o las dos formas se separan sin que nadie avise.
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'username': username,
+        'email': email,
+        'full_name': fullName,
+        'roles': roles,
+        'permissions': permissions,
+        'denied_permissions': deniedPermissions,
+      };
+
   final String id;
   final String username;
   final String? email;

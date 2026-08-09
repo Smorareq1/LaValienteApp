@@ -30,6 +30,10 @@ dependencies:
   drift: ^2.28.0
   flutter_secure_storage: ^9.2.4
 
+  # HMAC-SHA256 para el verificador de contraseña que permite entrar sin señal
+  # en un teléfono donde ya se entró en línea (ver core/auth/offline_credential).
+  crypto: ^3.0.6
+
   # Operaciones funcionales
   fpdart: ^1.1.1
   sqlcipher_flutter_libs: ^0.6.8

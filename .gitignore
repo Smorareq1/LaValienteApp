@@ -46,3 +46,8 @@ app.*.map.json
 
 #Claude
 .claude/
+
+# Direccion del backend para desarrollo. Fuera del repositorio porque es publico
+# y una URL de dev tunnel deja el backend al alcance de cualquiera que la lea.
+# La plantilla versionada es dev.json.example.
+/dev.json

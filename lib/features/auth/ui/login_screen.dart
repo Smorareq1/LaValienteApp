@@ -72,7 +72,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       _formError = switch (failure) {
         null => null,
         AuthFailure() => 'Usuario o contraseña incorrectos',
-        NetworkFailure() => 'Sin conexión con el servidor. Verificá tu red.',
+        OfflineLoginFailure(:final message) => message,
+        NetworkFailure(:final message) => message,
+        TimeoutFailure() => 'El servidor tardó demasiado. Probá de nuevo.',
         ValidationFailure(:final message) => message,
         _ => 'Algo salió mal. Intentá de nuevo.',
       };
