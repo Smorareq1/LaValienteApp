@@ -1,0 +1,20 @@
+{
+  "_comment": [
+    "Backend de PRODUCCION (Railway). Copialo a prod.json y pone la URL de tu",
+    "servicio. prod.json esta en el .gitignore, igual que dev.json: este",
+    "repositorio es publico y preferimos no publicar la direccion del backend",
+    "que atiende al negocio.",
+    "",
+    "La URL es la que Railway genero en Settings -> Networking -> Public",
+    "Networking. Termina en .up.railway.app salvo que haya dominio propio.",
+    "",
+    "https:// y SIN puerto: Railway sirve por el 443 estandar. Un ':8000'",
+    "pegado aqui es el error que deja la app sin conectar, porque ese puerto",
+    "es el del contenedor, no el del borde.",
+    "",
+    "Sin barra final: Env.apiV1BaseUrl concatena '/api/v1' y una barra de mas",
+    "produce '//api/v1', que el servidor responde 404."
+  ],
+  "API_BASE_URL": "https://TU-SERVICIO-production.up.railway.app",
+  "APP_ENV": "prod"
+}

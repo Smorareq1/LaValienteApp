@@ -54,10 +54,58 @@ flutter run
 
 ### Backend
 
-La app apunta al backend en `http://localhost:8000` (`/api/v1`). Para cambiarlo:
+**El backend se elige al compilar, no al ejecutar.** No hay pantalla de ajustes
+donde cambiar de servidor: un APK sabe contra qué API habla desde que se arma, y
+eso es lo que hace imposible que un dispositivo del mostrador termine
+escribiendo en la base de desarrollo.
+
+Dos archivos, ninguno versionado (este repositorio es público). Copia las
+plantillas la primera vez:
+
+```bash
+cp dev.json.example dev.json      # tu backend local
+cp prod.json.example prod.json    # el de Railway; pega ahí la URL
+```
+
+| Entorno | Archivo | Comando |
+| --- | --- | --- |
+| Desarrollo | `dev.json` | `flutter run --dart-define-from-file=dev.json` |
+| Producción | `prod.json` | `flutter run --dart-define-from-file=prod.json` |
+
+O sin archivo, para una prueba suelta:
 
 ```bash
 flutter run --dart-define=API_BASE_URL=http://10.0.2.2:8000   # emulador Android
+```
+
+### Compilar un APK
+
+```bash
+# Desarrollo — contra el backend local
+flutter build apk --release --dart-define-from-file=dev.json
+
+# Producción — contra Railway
+flutter build apk --release --dart-define-from-file=prod.json
+```
+
+El APK queda en `build/app/outputs/flutter-apk/app-release.apk`. Como el nombre
+es el mismo en los dos casos, conviene renombrarlo al sacarlo:
+
+```bash
+mv build/app/outputs/flutter-apk/app-release.apk lavaliente-prod.apk
+```
+
+> **Nunca compiles un release sin `--dart-define-from-file`.** Sin él,
+> `API_BASE_URL` cae en su valor por omisión (`http://localhost:8000`), que en un
+> teléfono es el teléfono mismo: el APK se instala, abre, y solo falla al primer
+> login, ya en el mostrador. `Env.isMisconfiguredRelease` detecta ese caso y deja
+> una advertencia en el log al arrancar, pero el aviso llega tarde — el hábito de
+> pasar siempre el archivo es la verdadera protección.
+
+Para confirmar contra qué backend quedó un APK ya armado:
+
+```bash
+adb logcat -s flutter:V | Select-String '\[LV\]'
 ```
 
 > La app es **native-only**: el opener de la BD usa `dart:io`, `path_provider` y

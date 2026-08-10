@@ -1,7 +1,7 @@
 {
   // El backend se elige en compilacion (Env.apiBaseUrl es String.fromEnvironment).
-  // La direccion vive en dev.json, que NO se versiona: este repositorio es
-  // publico. Copia dev.json.example a dev.json la primera vez.
+  // La direccion vive en dev.json / prod.json, que NO se versionan: este
+  // repositorio es publico. Copia los .example la primera vez.
   "version": "0.2.0",
   "configurations": [
     {
@@ -10,6 +10,15 @@
       "type": "dart",
       "program": "lib/main.dart",
       "args": ["--dart-define-from-file", "dev.json"]
+    },
+    {
+      "name": "App (PRODUCCION - Railway)",
+      "request": "launch",
+      "type": "dart",
+      "program": "lib/main.dart",
+      // Corre contra el backend real, con datos reales. Util para reproducir
+      // algo que solo pasa en produccion; no para trabajar el dia a dia.
+      "args": ["--dart-define-from-file", "prod.json"]
     },
     {
       "name": "App (emulador Android)",
