@@ -28,11 +28,30 @@ dependencies:
 
   # Persistencia
   drift: ^2.28.0
-  drift_flutter: ^0.2.7
   flutter_secure_storage: ^9.2.4
+
+  # HMAC-SHA256 para el verificador de contraseña que permite entrar sin señal
+  # en un teléfono donde ya se entró en línea (ver core/auth/offline_credential).
+  crypto: ^3.0.6
 
   # Operaciones funcionales
   fpdart: ^1.1.1
+  sqlcipher_flutter_libs: ^0.6.8
+  path_provider: ^2.1.5
+  path: ^1.9.1
+  uuid: ^4.6.0
+  connectivity_plus: ^7.3.1
+  sqlite3: ^2.9.4
+
+  # Cámara y galería para la foto del producto (§8.3). El recorte y la
+  # compresión los hace el propio plugin al pedirle un tamaño máximo, así que no
+  # entra una dependencia de imagen aparte.
+  image_picker: ^1.1.2
+
+  # El comprobante se comparte por el share sheet del sistema, que es por donde
+  # sale WhatsApp (§17.1). No entra impresora térmica en la fase 1.
+  share_plus: ^10.1.4
+  receive_sharing_intent: ^1.8.1
 
 dev_dependencies:
   flutter_test:
@@ -43,9 +62,31 @@ dev_dependencies:
   build_runner: ^2.4.15
   riverpod_generator: ^2.6.3
   drift_dev: ^2.28.0
+  integration_test:
+    sdk: flutter
+  flutter_launcher_icons: ^0.14.4
 
 flutter:
   uses-material-design: true
 
+  # assets/icons/ no entra aquí a propósito: son la fuente del icono de
+  # lanzador, los consume flutter_launcher_icons al generar, y no hacen falta
+  # dentro del paquete en tiempo de ejecución.
   assets:
     - assets/images/
+
+# Icono de lanzador. El arte lo genera tool/build_icons.py; esto solo reparte
+# los PNG de 1024 en las densidades de Android y iOS.
+#
+#   dart run flutter_launcher_icons
+#
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "assets/icons/app_icon.png"
+  # Las dos capas del icono adaptativo de Android. El fondo va a sangre y el
+  # frente lleva la marca dentro del círculo seguro de 66dp sobre 108dp.
+  adaptive_icon_background: "assets/icons/app_icon_background.png"
+  adaptive_icon_foreground: "assets/icons/app_icon_foreground.png"
+  # iOS rechaza iconos con canal alfa; el nuestro trae la sombra en PNG.
+  remove_alpha_ios: true

@@ -41,44 +41,56 @@ class AuthHeader extends StatelessWidget {
             ),
             Padding(
               padding: EdgeInsets.fromLTRB(28, topPadding + 64, 28, 70),
-              child: Column(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-                    decoration: BoxDecoration(
-                      color: AppColors.white,
-                      borderRadius: BorderRadius.circular(22),
-                      boxShadow: const [
-                        BoxShadow(
-                          color: Color(0x59000000),
-                          offset: Offset(0, 16),
-                          blurRadius: 30,
-                          spreadRadius: -12,
-                        ),
-                      ],
+              // Ancho completo a propósito. Como hijo sin posicionar del Stack,
+              // el Column recibe restricciones flojas y se encogería al ancho de
+              // su línea más larga, anclado arriba a la izquierda: el `center`
+              // por omisión centraría dentro de esa caja angosta y no dentro de
+              // la cabecera. Con el ancho fijo el centrado es contra la pantalla.
+              child: SizedBox(
+                width: double.infinity,
+                child: Column(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 20,
+                        vertical: 14,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppColors.white,
+                        borderRadius: BorderRadius.circular(22),
+                        boxShadow: const [
+                          BoxShadow(
+                            color: Color(0x59000000),
+                            offset: Offset(0, 16),
+                            blurRadius: 30,
+                            spreadRadius: -12,
+                          ),
+                        ],
+                      ),
+                      child: Image.asset(
+                        'assets/images/logo_la_valiente.png',
+                        width: 180,
+                      ),
                     ),
-                    child: Image.asset(
-                      'assets/images/logo_la_valiente.png',
-                      width: 180,
+                    const SizedBox(height: 22),
+                    Text(
+                      title,
+                      textAlign: TextAlign.center,
+                      style: AppTypography.h2.copyWith(
+                        color: AppColors.white,
+                        fontWeight: FontWeight.w800,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 22),
-                  Text(
-                    title,
-                    style: AppTypography.h2.copyWith(
-                      color: AppColors.white,
-                      fontWeight: FontWeight.w800,
+                    const SizedBox(height: AppSpacing.xs),
+                    Text(
+                      subtitle,
+                      textAlign: TextAlign.center,
+                      style: AppTypography.bodySm.copyWith(
+                        color: AppColors.white.withValues(alpha: 0.9),
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: AppSpacing.xs),
-                  Text(
-                    subtitle,
-                    textAlign: TextAlign.center,
-                    style: AppTypography.bodySm.copyWith(
-                      color: AppColors.white.withValues(alpha: 0.9),
-                    ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ],

@@ -6,7 +6,7 @@ part of 'api_client.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$apiClientHash() => r'd20f988e85bcf6789ee5ae2075fb07410ffaa0a8';
+String _$apiClientHash() => r'cf301a5c3da1783a649be1883fb5468e4205c0e9';
 
 /// Cliente HTTP central de la app, apuntando al backend `/api/v1`.
 ///

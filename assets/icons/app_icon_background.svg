@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024" role="img" aria-label="Fondo de marca">
+  <title>La Valiente — capa de fondo (icono adaptativo de Android)</title>
+  <!-- Va a sangre y sin esquinas redondeadas: el redondeo lo aplica la mascara
+       del sistema, y si lo trajera el archivo se veria un borde doble.
+       El equivalente plano es adaptive_icon_background: "#E2168B". -->
+  <defs>
+    <linearGradient id="lv-bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#EC5AAC"/>
+      <stop offset="0.42" stop-color="#E2168B"/>
+      <stop offset="1" stop-color="#A50E67"/>
+    </linearGradient>
+    <radialGradient id="lv-glow" cx="0.26" cy="0.18" r="0.9">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.20"/>
+      <stop offset="1" stop-color="#FFFFFF" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="1024" height="1024" fill="url(#lv-bg)"/>
+  <rect width="1024" height="1024" fill="url(#lv-glow)"/>
+</svg>

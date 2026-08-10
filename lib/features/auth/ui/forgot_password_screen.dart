@@ -50,6 +50,7 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
       (failure) => setState(() {
         _formError = switch (failure) {
           NetworkFailure() => 'Sin conexión con el servidor. Verificá tu red.',
+          TimeoutFailure() => 'El servidor tardó demasiado. Probá de nuevo.',
           _ => 'No se pudo enviar el código. Intentá de nuevo.',
         };
       }),

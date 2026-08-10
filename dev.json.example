@@ -1,0 +1,17 @@
+{
+  "_comment": [
+    "Copialo a dev.json y pone la direccion de TU backend. dev.json esta en el",
+    ".gitignore porque este repositorio es publico y la URL de un dev tunnel deja",
+    "el backend de desarrollo al alcance de cualquiera que la lea.",
+    "",
+    "Sin barra final: Env.apiV1BaseUrl concatena '/api/v1' y una barra de mas",
+    "produce '//api/v1', que el servidor responde 404.",
+    "",
+    "Valores tipicos:",
+    "  emulador Android  http://10.0.2.2:8000",
+    "  telefono por USB  http://localhost:8000   (con: adb reverse tcp:8000 tcp:8000)",
+    "  telefono por wifi http://192.168.x.x:8000 (backend con --host 0.0.0.0)",
+    "  dev tunnel        https://<id>-8000.<region>.devtunnels.ms"
+  ],
+  "API_BASE_URL": "http://10.0.2.2:8000"
+}

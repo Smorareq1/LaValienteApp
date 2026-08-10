@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    El backend todavía se sirve por HTTP plano: en el local vive en la red del
+    negocio (`http://192.168.x.x:8000`) y no hay certificado que presentar.
+    Desde Android 9 el tráfico en claro está prohibido por omisión, así que sin
+    esto la app compilada en release resuelve el servidor y aun así no le habla.
+
+    Cuando el backend pase a HTTPS este archivo se borra entero y la referencia
+    del manifest con él: el bloqueo por omisión vuelve a ser el correcto.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true" />
+</network-security-config>

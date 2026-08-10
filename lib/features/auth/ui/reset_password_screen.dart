@@ -83,6 +83,7 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
         _formError = switch (failure) {
           AuthFailure() => 'Código inválido o vencido. Pedí uno nuevo.',
           NetworkFailure() => 'Sin conexión con el servidor. Verificá tu red.',
+          TimeoutFailure() => 'El servidor tardó demasiado. Probá de nuevo.',
           ValidationFailure(:final message) => message,
           _ => 'Algo salió mal. Intentá de nuevo.',
         };

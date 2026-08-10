@@ -62,6 +62,16 @@ abstract final class AppTypography {
         color: AppColors.textMuted,
       );
 
+  /// Cifra monetaria · Poppins 800 · interlineado 1 para que las cifras
+  /// grandes no arrastren espacio de más dentro de las tarjetas.
+  static TextStyle money({double fontSize = 16, Color color = AppColors.textPrimary}) =>
+      GoogleFonts.poppins(
+        fontSize: fontSize,
+        fontWeight: FontWeight.w800,
+        height: 1,
+        color: color,
+      );
+
   /// Texto de botón · Poppins 700.
   static TextStyle button({double fontSize = 14, Color color = AppColors.white}) =>
       GoogleFonts.poppins(

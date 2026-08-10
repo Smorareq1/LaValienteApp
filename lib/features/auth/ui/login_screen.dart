@@ -38,11 +38,23 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     final identifier = _identifierController.text.trim();
     final password = _passwordController.text;
     setState(() {
-      _identifierError = identifier.isEmpty ? 'Ingresá tu usuario o correo' : null;
+      _identifierError = identifier.isEmpty ? 'Ingresá tu usuario' : null;
       _passwordError = password.isEmpty ? 'Ingresá tu contraseña' : null;
       _formError = null;
     });
     return _identifierError == null && _passwordError == null;
+  }
+
+  /// Limpia el error anclado al campo en cuanto la persona lo corrige, para no
+  /// dejar el borde rojo pegado mientras escribe.
+  void _clearError(void Function() clear) {
+    if (_identifierError == null && _passwordError == null && _formError == null) {
+      return;
+    }
+    setState(() {
+      clear();
+      _formError = null;
+    });
   }
 
   Future<void> _submit() async {
@@ -60,7 +72,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       _formError = switch (failure) {
         null => null,
         AuthFailure() => 'Usuario o contraseña incorrectos',
-        NetworkFailure() => 'Sin conexión con el servidor. Verificá tu red.',
+        OfflineLoginFailure(:final message) => message,
+        NetworkFailure(:final message) => message,
+        TimeoutFailure() => 'El servidor tardó demasiado. Probá de nuevo.',
         ValidationFailure(:final message) => message,
         _ => 'Algo salió mal. Intentá de nuevo.',
       };
@@ -80,23 +94,24 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               subtitle: 'Ingresá para gestionar la lavandería',
             ),
             Padding(
-              padding: const EdgeInsets.fromLTRB(26, AppSpacing.xl, 26, AppSpacing.lg),
+              padding: const EdgeInsets.fromLTRB(26, 52, 26, 32),
               child: AutofillGroup(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     AppFormField(
-                      label: 'Usuario o correo',
+                      label: 'Usuario',
                       controller: _identifierController,
-                      hintText: 'sebasm',
+                      hintText: 'mgonzalez',
                       errorText: _identifierError,
                       enabled: !_submitting,
                       prefixIcon: const Icon(Icons.person_outline),
                       keyboardType: TextInputType.text,
                       textInputAction: TextInputAction.next,
                       autofillHints: const [AutofillHints.username],
+                      onChanged: (_) => _clearError(() => _identifierError = null),
                     ),
-                    const SizedBox(height: AppSpacing.md),
+                    const SizedBox(height: 18),
                     AppFormField(
                       label: 'Contraseña',
                       controller: _passwordController,
@@ -107,6 +122,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       prefixIcon: const Icon(Icons.lock_outline),
                       textInputAction: TextInputAction.done,
                       autofillHints: const [AutofillHints.password],
+                      onChanged: (_) => _clearError(() => _passwordError = null),
                       onSubmitted: (_) => _submit(),
                     ),
                     const SizedBox(height: AppSpacing.sm),
@@ -116,40 +132,28 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         onPressed: _submitting
                             ? null
                             : () => context.push(ForgotPasswordScreen.path),
+                        style: TextButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
+                          minimumSize: Size.zero,
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
                         child: Text(
                           '¿Olvidaste tu contraseña?',
                           style: AppTypography.bodySm.copyWith(
                             color: AppColors.primary600,
-                            fontWeight: FontWeight.w600,
+                            fontWeight: FontWeight.w700,
                           ),
                         ),
                       ),
                     ),
                     if (_formError != null) ...[
                       const SizedBox(height: AppSpacing.md),
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: const BoxDecoration(
-                          color: AppColors.errorBg,
-                          borderRadius: AppRadius.mdAll,
-                        ),
-                        child: Row(
-                          children: [
-                            const Icon(Icons.error_outline,
-                                size: 18, color: AppColors.errorText),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                _formError!,
-                                style: AppTypography.bodySm
-                                    .copyWith(color: AppColors.errorText),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
+                      _FormErrorBanner(message: _formError!),
                     ],
-                    const SizedBox(height: AppSpacing.lg),
+                    const SizedBox(height: 26),
                     AppButton(
                       label: 'Iniciar sesión',
                       size: AppButtonSize.lg,
@@ -165,6 +169,35 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _FormErrorBanner extends StatelessWidget {
+  const _FormErrorBanner({required this.message});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: const BoxDecoration(
+        color: AppColors.errorBg,
+        borderRadius: AppRadius.mdAll,
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.error_outline, size: 18, color: AppColors.errorText),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              message,
+              style: AppTypography.bodySm.copyWith(color: AppColors.errorText),
+            ),
+          ),
+        ],
       ),
     );
   }

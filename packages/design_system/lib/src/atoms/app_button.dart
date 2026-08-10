@@ -104,7 +104,18 @@ class AppButton extends StatelessWidget {
           ),
           const SizedBox(width: 8),
         ],
-        Text(label, style: AppTypography.button(fontSize: fontSize, color: foreground)),
+        // Flexible y no Text a secas: dos botones repartiéndose el ancho de un
+        // teléfono angosto no dejan sitio para "Guardar cambios", y un texto
+        // rígido ahí desborda la fila en vez de acortarse.
+        Flexible(
+          child: Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
+            style: AppTypography.button(fontSize: fontSize, color: foreground),
+          ),
+        ),
         if (trailingIcon != null && !loading) ...[
           const SizedBox(width: 8),
           IconTheme(
