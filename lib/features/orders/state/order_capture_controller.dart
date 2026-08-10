@@ -467,13 +467,24 @@ class OrderCaptureController extends _$OrderCaptureController {
   /// medir cuánto hubo que corregir (D7)— y por eso los campos con poca
   /// confianza llegan marcados en vez de silenciosamente llenos.
   ///
-  /// Lo que **no** hace: elegir al cliente. La sugerencia del §7.5 se enseña en
-  /// la pantalla del escaneo como pregunta y se confirma aquí a mano. Aceptarla
-  /// sola archivaría la ropa de alguien bajo el nombre de otro.
-  Future<void> applyScan(ScanResult scan) async {
+  /// El cliente **no** se adivina: [customer] llega solo si alguien contestó que
+  /// sí en la pantalla del escaneo (§7.5), o si lo acaba de registrar ahí mismo
+  /// con los datos que la foto leyó. Sin esa respuesta la boleta se abre sin
+  /// cliente, porque aceptar la sugerencia sola archivaría la ropa de una
+  /// persona bajo el nombre de otra.
+  Future<void> applyScan(ScanResult scan, {Customer? customer}) async {
     final draft = scan.draft;
-    final current = state.valueOrNull;
+    var current = state.valueOrNull;
     if (draft == null || current == null) return;
+
+    // La fecha primero y aparte: rehace el libro de precios y el de promociones,
+    // así que todo lo que se vuelca después ya se calcula con lo que regía ese
+    // día. Al revés, una boleta atrasada se prellenaría con los precios de hoy.
+    final read = draft.orderDate.value;
+    final scanned = read == null ? null : parseIsoDate(read);
+    if (scanned != null && isoDate(scanned) != isoDate(current.orderDate)) {
+      current = await _load(scanned, from: current);
+    }
 
     final byCode = {for (final service in current.services) service.code: service};
     final quantities = <String, int>{};
@@ -516,10 +527,18 @@ class OrderCaptureController extends _$OrderCaptureController {
       weightText = Fixed2.format(draft.weightLbs.value!);
     }
 
+    // El NIT del cliente confirmado gana al de la foto: el que está registrado
+    // es con el que se le factura, y el de la boleta es una lectura. Sin cliente
+    // se queda el leído, que es mejor que nada.
+    final nit = customer != null
+        ? nitOf(customer)
+        : draft.nit.value ?? current.nit;
+
     state = AsyncData(
       current.copyWith(
+        customer: customer,
         bookletSerial: draft.bookletSerial.value ?? current.bookletSerial,
-        nit: draft.nit.value ?? current.nit,
+        nit: nit,
         weightText: weightText,
         washByWeight: washByWeight,
         observations: draft.observations.value ?? current.observations,

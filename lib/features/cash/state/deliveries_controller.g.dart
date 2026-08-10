@@ -53,7 +53,7 @@ final deliverableOrdersProvider =
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
 typedef DeliverableOrdersRef = AutoDisposeProviderRef<List<OrderListItem>>;
-String _$deliveryBatchHash() => r'0c1253c18be9904c72551683ba519c78cd9aabf9';
+String _$deliveryBatchHash() => r'9ddfe0f0ee712d4b4588884fbec9651daf8ec37a';
 
 /// Lo marcado, en el orden en que aparece la lista y ya sumado.
 ///
@@ -91,7 +91,7 @@ final deliverySearchQueryProvider =
     );
 
 typedef _$DeliverySearchQuery = AutoDisposeNotifier<String>;
-String _$deliverySelectionHash() => r'566b7839ea1aeaa17c37106f30815498628758de';
+String _$deliverySelectionHash() => r'9a403bcbb1c43bc6ade0c3655fd7577d3e6032cb';
 
 /// Las boletas marcadas para entregar, por id de pedido.
 ///

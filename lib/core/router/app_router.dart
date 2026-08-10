@@ -14,6 +14,7 @@ import '../../features/cash/ui/cash_screen.dart';
 import '../../features/cash/ui/close_history_screen.dart';
 import '../../features/cash/ui/day_close_screen.dart';
 import '../../features/cash/ui/supply_sale_screen.dart';
+import '../../features/customers/models/customer.dart';
 import '../../features/customers/ui/customer_detail_screen.dart';
 import '../../features/customers/ui/customers_screen.dart';
 import '../../features/catalog/ui/catalog_screen.dart';
@@ -31,7 +32,10 @@ import '../../features/orders/ui/order_services_screen.dart';
 import '../../features/orders/ui/orders_screen.dart';
 import '../../features/promotions/ui/promotions_screen.dart';
 import '../../features/scan/models/scan.dart';
+import '../../features/scan/state/shared_images_controller.dart';
+import '../../features/scan/ui/cash_sheet_scan_screen.dart';
 import '../../features/scan/ui/scan_screen.dart';
+import '../../features/scan/ui/shared_images_screen.dart';
 import '../../features/shell/ui/app_shell.dart';
 import '../../features/staff/ui/attendance_screen.dart';
 import '../../features/staff/ui/employees_screen.dart';
@@ -68,6 +72,9 @@ const Map<String, List<String>> _routePermissions = {
   // (§13, y por eso `daily_close.read` es suyo por omisión en el catálogo).
   DayCloseScreen.path: [AppPermissions.dailyCloseRead],
   CloseHistoryScreen.path: [AppPermissions.dailyCloseRead],
+  // Importar la hoja del día cobra y entrega en lote, así que la puerta es la
+  // suya y no la de la caja: leerla ya es escribir en cuanto se toca el botón.
+  CashSheetScanScreen.path: [AppPermissions.scansImportClose],
   '/inventory': [AppPermissions.inventoryRead],
   '/staff': [AppPermissions.attendanceRecord, AppPermissions.staffRead],
   '/staff/employees': [AppPermissions.staffRead],
@@ -91,6 +98,10 @@ GoRouter appRouter(Ref ref) {
   final refreshNotifier = ValueNotifier(0);
   ref.onDispose(refreshNotifier.dispose);
   ref.listen(authControllerProvider, (_, _) => refreshNotifier.value++);
+  // Compartir desde WhatsApp trae la app al frente sin tocarla: el intent llega
+  // por un canal nativo, no por una ruta. Sin este `listen`, las fotos quedarían
+  // en el provider y la app se abriría en Inicio como si nada hubiera pasado.
+  ref.listen(sharedImagesControllerProvider, (_, _) => refreshNotifier.value++);
 
   // Rutas accesibles sin sesión (login y recuperación de contraseña).
   const publicPaths = {
@@ -116,9 +127,20 @@ GoRouter appRouter(Ref ref) {
         return publicPaths.contains(location) ? null : LoginScreen.path;
       }
       if (publicPaths.contains(location) || location == SplashScreen.path) {
-        return HomeScreen.path;
+        // Con fotos esperando, el destino tras la sesión no es Inicio: es la
+        // pregunta de qué son. Se comprueba justo aquí —en el salto de
+        // splash/login— porque compartir con la app cerrada arranca en el splash
+        // y sin esto el lote se quedaría en la cola sin que nadie lo viera.
+        return _hasSharedImages(ref) ? SharedImagesScreen.path : HomeScreen.path;
       }
       if (!_isAllowed(user, location)) return HomeScreen.path;
+      // Con la app ya abierta el intent llega por el stream, y quien esté en
+      // Inicio tiene que enterarse. Solo desde Inicio: interrumpir a alguien que
+      // está a media boleta para preguntarle por una foto sería peor que
+      // esperar a que termine.
+      if (location == HomeScreen.path && _hasSharedImages(ref)) {
+        return SharedImagesScreen.path;
+      }
       return null;
     },
     routes: [
@@ -175,13 +197,28 @@ GoRouter appRouter(Ref ref) {
         path: ScanScreen.path,
         builder: (context, state) => const ScanScreen(),
       ),
+      // Y por lo mismo la hoja del día va antes que la rama de Caja: dentro de
+      // ella `/cash/:id` casaría con "scan".
+      GoRoute(
+        path: CashSheetScanScreen.path,
+        builder: (context, state) => const CashSheetScanScreen(),
+      ),
+      // Lo que llegó compartido, antes de saber qué es. Solo pide sesión: el
+      // permiso lo pone cada destino —la boleta el suyo, la hoja del día el
+      // suyo— y la pantalla ya deshabilita la opción que no se puede tomar.
+      GoRoute(
+        path: SharedImagesScreen.path,
+        builder: (context, state) => const SharedImagesScreen(),
+      ),
       GoRoute(
         path: OrderCaptureScreen.path,
         // El borrador viaja como `extra` y no en la ruta: es un prellenado, no
         // una dirección. `/orders/new` guardado en un enlace tiene que seguir
         // significando "boleta en blanco".
-        builder: (context, state) =>
-            OrderCaptureScreen(scan: _scanFromExtra(state.extra)),
+        builder: (context, state) => OrderCaptureScreen(
+          scan: _scanFromExtra(state.extra),
+          scanCustomer: _customerFromExtra(state.extra),
+        ),
       ),
       // Corregir una boleta es la misma pantalla precargada (plan 0001 §7.3),
       // así que vive donde ella: fuera del shell, porque el footer del total
@@ -384,6 +421,23 @@ ScanResult? _scanFromExtra(Object? extra) {
   if (extra is! Map) return null;
   final scan = extra['scan'];
   return scan is ScanResult ? scan : null;
+}
+
+/// El cliente que se confirmó en la pantalla del escaneo, si se confirmó alguno.
+Customer? _customerFromExtra(Object? extra) {
+  if (extra is! Map) return null;
+  final customer = extra['customer'];
+  return customer is Customer ? customer : null;
+}
+
+/// Si hay fotos compartidas esperando a que alguien diga qué son.
+///
+/// Solo cuenta cuando **no** se ha elegido todavía el tipo: una vez elegido, el
+/// lote ya está en manos de su pantalla de escaneo, y volver a preguntar sería
+/// un bucle entre la pregunta y la respuesta.
+bool _hasSharedImages(Ref ref) {
+  final shared = ref.read(sharedImagesControllerProvider);
+  return !shared.isEmpty && shared.kind == null;
 }
 
 /// Comprueba el permiso mínimo de [location] contra los permisos de [user].

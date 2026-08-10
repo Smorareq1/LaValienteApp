@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:la_valiente/core/errors/app_failure.dart';
 import 'package:la_valiente/features/scan/data/scan_remote_datasource.dart';
+import 'package:la_valiente/features/scan/models/cash_sheet.dart';
 import 'package:la_valiente/features/scan/models/scan.dart';
 import 'package:la_valiente/features/scan/models/ticket_lookup.dart';
 import 'package:la_valiente/features/scan/state/scan_controller.dart';
@@ -36,6 +37,19 @@ class _FakeScans implements ScanRemoteDataSource {
     Uint8List image, {
     String filename = 'boleta.jpg',
   }) => throw UnimplementedError();
+
+  /// Y la hoja del día vive en su propia pantalla, por lo mismo.
+  @override
+  Future<CashSheetResult> scanCashSheet(
+    Uint8List image, {
+    String filename = 'cierre.jpg',
+  }) => throw UnimplementedError();
+
+  @override
+  Future<CashSheetApplyResult> applyCashSheet(
+    String scanId,
+    CashSheetApply data,
+  ) => throw UnimplementedError();
 }
 
 /// Un PNG de un pixel: `Image.memory` necesita bytes que de verdad decodifiquen.

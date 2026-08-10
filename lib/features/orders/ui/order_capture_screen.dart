@@ -8,6 +8,7 @@ import '../../../core/money/fixed2.dart';
 import '../../../core/network/connectivity.dart';
 import '../../../core/time/business_date.dart';
 import '../../auth/ui/widgets/permission_gate.dart';
+import '../../customers/models/customer.dart';
 import '../../customers/ui/widgets/customer_picker.dart';
 import '../../scan/models/scan.dart';
 import '../../scan/ui/scan_screen.dart';
@@ -30,7 +31,12 @@ import 'widgets/services_section.dart';
 /// clientes, el total. Guardar deja el pedido en pantalla y una operación en el
 /// outbox; la red decide cuándo, no si.
 class OrderCaptureScreen extends ConsumerStatefulWidget {
-  const OrderCaptureScreen({super.key, this.orderId, this.scan});
+  const OrderCaptureScreen({
+    super.key,
+    this.orderId,
+    this.scan,
+    this.scanCustomer,
+  });
 
   static const String path = '/orders/new';
 
@@ -42,6 +48,12 @@ class OrderCaptureScreen extends ConsumerStatefulWidget {
   /// Sigue siendo esta pantalla la que guarda, y sigue siendo una persona la
   /// que decide: el escaneo prellena, nunca confirma.
   final ScanResult? scan;
+
+  /// El cliente que alguien **confirmó** en la pantalla del escaneo, sea porque
+  /// dijo que sí a la sugerencia del §7.5 o porque lo registró ahí mismo. Viaja
+  /// aparte del borrador justamente porque no salió de la foto: salió de una
+  /// respuesta.
+  final Customer? scanCustomer;
 
   @override
   ConsumerState<OrderCaptureScreen> createState() => _OrderCaptureScreenState();
@@ -112,7 +124,7 @@ class _OrderCaptureScreenState extends ConsumerState<OrderCaptureScreen> {
       if (!mounted) return;
       ref
           .read(orderCaptureControllerProvider(widget.orderId).notifier)
-          .applyScan(scan);
+          .applyScan(scan, customer: widget.scanCustomer);
     });
   }
 

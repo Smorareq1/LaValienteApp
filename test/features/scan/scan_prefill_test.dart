@@ -3,12 +3,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:la_valiente/core/database/app_database.dart';
+import 'package:la_valiente/core/database/tables/synced_columns.dart';
 import 'package:la_valiente/core/storage/secure_storage_service.dart';
+import 'package:la_valiente/core/time/business_date.dart';
 import 'package:la_valiente/features/auth/models/auth_user.dart';
 import 'package:la_valiente/features/auth/state/auth_controller.dart';
 import 'package:la_valiente/features/catalog/data/catalog_mirrors.dart';
 import 'package:la_valiente/features/customers/data/customers_local_datasource.dart';
 import 'package:la_valiente/features/customers/data/customers_repository.dart';
+import 'package:la_valiente/features/customers/models/customer.dart';
 import 'package:la_valiente/features/orders/data/orders_local_datasource.dart';
 import 'package:la_valiente/features/orders/data/orders_repository.dart';
 import 'package:la_valiente/features/orders/state/order_capture_controller.dart';
@@ -211,7 +214,11 @@ void main() {
     );
   }
 
-  Future<ProviderContainer> open(WidgetTester tester, ScanResult? scan) async {
+  Future<ProviderContainer> open(
+    WidgetTester tester,
+    ScanResult? scan, {
+    Customer? scanCustomer,
+  }) async {
     tester.view.physicalSize = const Size(400, 2600);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
@@ -229,7 +236,9 @@ void main() {
     await tester.pumpWidget(
       UncontrolledProviderScope(
         container: container,
-        child: MaterialApp(home: OrderCaptureScreen(scan: scan)),
+        child: MaterialApp(
+          home: OrderCaptureScreen(scan: scan, scanCustomer: scanCustomer),
+        ),
       ),
     );
     await tester.pumpAndSettle();
@@ -368,5 +377,39 @@ void main() {
 
     expect(find.text('Escanear'), findsOneWidget);
     expect(find.textContaining('Boleta escaneada'), findsNothing);
+  });
+
+  prefillTest('la fecha de la boleta manda sobre la de hoy', (tester) async {
+    // Una boleta atrasada se cobra con los precios que regían ese día (D1), así
+    // que la fecha leída tiene que llegar **antes** de que se calcule nada.
+    await seedCatalog();
+    final container = await open(
+      tester,
+      _scan(overrides: {'order_date': _field('2026-07-30')}),
+    );
+
+    final state = container.read(orderCaptureControllerProvider(null)).value!;
+    expect(isoDate(state.orderDate), '2026-07-30');
+  });
+
+  prefillTest('el cliente confirmado en el escaneo abre la boleta a su nombre', (
+    tester,
+  ) async {
+    await seedCatalog();
+    const confirmed = Customer(
+      id: 'cust-1',
+      fullName: 'María López',
+      version: 1,
+      syncStatus: RowSyncStatus.synced,
+      nit: '1234567-8',
+    );
+
+    final container = await open(tester, _scan(), scanCustomer: confirmed);
+
+    final state = container.read(orderCaptureControllerProvider(null)).value!;
+    expect(state.customer?.id, 'cust-1');
+    // El NIT del cliente registrado gana al leído de la foto: es con el que se
+    // le factura.
+    expect(state.nit, '1234567-8');
   });
 }

@@ -11,17 +11,38 @@ import '../../models/customer.dart';
 /// Solo el nombre es obligatorio. Es deliberado: el mostrador captura mientras
 /// alguien espera con la ropa en la mano, y exigir el teléfono ahí llevaría a
 /// que se inventaran números para poder seguir.
+/// Lo que se leyó de una boleta escaneada, para no teclearlo de nuevo.
+///
+/// Un alta **prellenada**, no automática: los campos llegan escritos y la
+/// persona los ve antes de guardar, que es la misma regla del §7.5 del plan
+/// 0003 —la lectura propone y alguien confirma— aplicada al cliente nuevo.
+class CustomerPrefill {
+  const CustomerPrefill({this.fullName, this.phone, this.address});
+
+  final String? fullName;
+  final String? phone;
+  final String? address;
+}
+
 class CustomerFormSheet extends ConsumerStatefulWidget {
-  const CustomerFormSheet({super.key, this.customer});
+  const CustomerFormSheet({super.key, this.customer, this.prefill});
 
   /// `null` para dar de alta; con valor, edita ese cliente.
   final Customer? customer;
 
+  /// Solo se mira al dar de alta: un cliente que ya existe trae sus propios
+  /// datos, y encimarle lo que dijo una foto sería pisarlos.
+  final CustomerPrefill? prefill;
+
   /// Abre la sheet y devuelve el cliente guardado, o `null` si se canceló.
-  static Future<Customer?> show(BuildContext context, {Customer? customer}) {
+  static Future<Customer?> show(
+    BuildContext context, {
+    Customer? customer,
+    CustomerPrefill? prefill,
+  }) {
     return AppBottomSheetScaffold.show<Customer>(
       context: context,
-      builder: (context) => CustomerFormSheet(customer: customer),
+      builder: (context) => CustomerFormSheet(customer: customer, prefill: prefill),
     );
   }
 
@@ -30,11 +51,20 @@ class CustomerFormSheet extends ConsumerStatefulWidget {
 }
 
 class _CustomerFormSheetState extends ConsumerState<CustomerFormSheet> {
-  late final _name = TextEditingController(text: widget.customer?.fullName ?? '');
-  late final _phone = TextEditingController(text: widget.customer?.phone ?? '');
+  CustomerPrefill? get _prefill =>
+      widget.customer == null ? widget.prefill : null;
+
+  late final _name = TextEditingController(
+    text: widget.customer?.fullName ?? _prefill?.fullName ?? '',
+  );
+  late final _phone = TextEditingController(
+    text: widget.customer?.phone ?? _prefill?.phone ?? '',
+  );
   late final _nit = TextEditingController(text: widget.customer?.nit ?? '');
   late final _email = TextEditingController(text: widget.customer?.email ?? '');
-  late final _address = TextEditingController(text: widget.customer?.address ?? '');
+  late final _address = TextEditingController(
+    text: widget.customer?.address ?? _prefill?.address ?? '',
+  );
   late final _notes = TextEditingController(text: widget.customer?.notes ?? '');
 
   String? _nameError;

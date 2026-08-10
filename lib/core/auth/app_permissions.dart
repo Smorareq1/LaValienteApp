@@ -48,6 +48,12 @@ abstract final class AppPermissions {
   static const String dailyCloseClose = 'daily_close.close';
   static const String dailyCloseReopen = 'daily_close.reopen';
 
+  /// Importar de un tirón la hoja «Registro Diario» fotografiada. El
+  /// colaborador **no** lo tiene: cobrar una boleta con el cliente enfrente y
+  /// cobrar quince de una foto no son la misma decisión, aunque por debajo usen
+  /// los mismos permisos.
+  static const String scansImportClose = 'scans.import_close';
+
   // Inventario.
   static const String inventoryRead = 'inventory.read';
   static const String inventoryManage = 'inventory.manage';

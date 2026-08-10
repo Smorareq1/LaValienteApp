@@ -31,6 +31,33 @@
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
+
+            <!-- "Compartir" desde WhatsApp (y desde la galería, y desde
+                 cualquier otra app) entra por aquí. Es la vía real por la que
+                 llegan las boletas: alguien fotografía el talonario, lo manda
+                 al grupo, y quien captura tendría que guardar la imagen, abrir
+                 la app y buscarla en la galería. Con esto la app aparece en la
+                 hoja de compartir y se salta los tres pasos.
+
+                 Dos filtros y no uno: `SEND` es una foto y `SEND_MULTIPLE` son
+                 varias, que es el caso normal —se comparten las catorce boletas
+                 del día de una vez— y sin el segundo Android sencillamente no
+                 ofrece la app cuando hay más de una seleccionada.
+
+                 Solo `image/*`: lo que esta app sabe leer es una fotografía. Un
+                 PDF o un vídeo compartido aquí solo podría terminar en un error,
+                 y aparecer en la lista de una app que no puede hacer el trabajo
+                 es peor que no aparecer. -->
+            <intent-filter>
+                <action android:name="android.intent.action.SEND"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <data android:mimeType="image/*"/>
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.SEND_MULTIPLE"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <data android:mimeType="image/*"/>
+            </intent-filter>
         </activity>
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->

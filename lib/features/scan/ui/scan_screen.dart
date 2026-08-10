@@ -6,12 +6,18 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/money/fixed2.dart';
+import '../../customers/data/customers_repository.dart';
+import '../../customers/models/customer.dart';
+import '../../customers/ui/widgets/customer_form_sheet.dart';
 import '../../orders/ui/order_capture_screen.dart';
 import '../../shell/ui/widgets/gradient_header.dart';
 import '../domain/scan_warnings.dart';
 import '../models/scan.dart';
 import '../state/scan_controller.dart';
+import '../state/shared_images_controller.dart';
 import '../state/ticket_photo_picker.dart';
+import 'widgets/scan_reading_view.dart';
+import 'widgets/shared_queue_note.dart';
 
 /// Escaneo de boleta (Plan 0006 §5.3 → Plan 0003).
 ///
@@ -120,6 +126,7 @@ class _Guide extends ConsumerWidget {
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 20, 16, 28),
       children: [
+        const SharedQueueNote(),
         Container(
           padding: const EdgeInsets.all(18),
           decoration: BoxDecoration(
@@ -227,35 +234,9 @@ class _Sending extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Expanded(child: _Photo(image: image)),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 28),
-          child: Column(
-            children: [
-              const CircularProgressIndicator(),
-              const SizedBox(height: 14),
-              Text(
-                'Leyendo la boleta…',
-                style: AppTypography.bodySm.copyWith(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                'Tarda unos segundos. Si no sale, siempre podés capturarla a '
-                'mano.',
-                style: AppTypography.helper.copyWith(
-                  color: AppColors.textSecondary,
-                ),
-                textAlign: TextAlign.center,
-              ),
-            ],
-          ),
-        ),
-      ],
+    return ScanReadingView(
+      image: image,
+      steps: ScanReadingView.ticketSteps,
     );
   }
 }
@@ -302,6 +283,7 @@ class _Failed extends ConsumerWidget {
                 label: 'Capturar a mano',
                 variant: AppButtonVariant.secondary,
                 onPressed: () {
+                  ref.read(sharedImagesControllerProvider.notifier).done();
                   ref.read(scanControllerProvider.notifier).reset();
                   context.pushReplacement(OrderCaptureScreen.path);
                 },
@@ -315,18 +297,55 @@ class _Failed extends ConsumerWidget {
 }
 
 /// Lo que se leyó, antes de volcarlo en la boleta.
-class _Review extends ConsumerWidget {
+class _Review extends ConsumerStatefulWidget {
   const _Review({required this.image, required this.result});
 
   final Uint8List image;
   final ScanResult result;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_Review> createState() => _ReviewState();
+}
+
+class _ReviewState extends ConsumerState<_Review> {
+  /// El cliente que se confirmó aquí, si se confirmó alguno. Arranca en `null`
+  /// siempre: la sugerencia del §7.5 es una pregunta, y una pregunta sin
+  /// contestar no es un sí.
+  Customer? _customer;
+
+  Future<void> _acceptMatch(CustomerMatch match) async {
+    final customer = await ref
+        .read(customersRepositoryProvider)
+        .byId(match.customerId);
+    if (!mounted) return;
+    if (customer == null) {
+      // El servidor sugirió a alguien que este dispositivo todavía no tiene
+      // espejado. No es un error que valga la pena explicar: se busca a mano.
+      setState(() => _customer = null);
+      return;
+    }
+    setState(() => _customer = customer);
+  }
+
+  Future<void> _register(ScanDraft draft) async {
+    final created = await CustomerFormSheet.show(
+      context,
+      prefill: CustomerPrefill(
+        fullName: draft.customerName.value,
+        phone: draft.customerPhone.value,
+        address: draft.customerAddress.value,
+      ),
+    );
+    if (created != null && mounted) setState(() => _customer = created);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final result = widget.result;
     final draft = result.draft;
     if (draft == null || draft.isEmpty) {
       return _Failed(
-        image: image,
+        image: widget.image,
         message:
             'De esta foto no se sacó nada aprovechable. Probá con más luz, o '
             'capturá la boleta a mano.',
@@ -342,12 +361,20 @@ class _Review extends ConsumerWidget {
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
             children: [
               _Summary(draft: draft),
+              const SizedBox(height: 14),
+              _CustomerBlock(
+                draft: draft,
+                chosen: _customer,
+                onAccept: _acceptMatch,
+                onRegister: () => _register(draft),
+                onClear: () => setState(() => _customer = null),
+              ),
               if (warnings.isNotEmpty) ...[
                 const SizedBox(height: 14),
                 _Warnings(warnings: warnings),
               ],
               const SizedBox(height: 14),
-              _PhotoCard(image: image),
+              _PhotoCard(image: widget.image),
             ],
           ),
         ),
@@ -368,8 +395,12 @@ class _Review extends ConsumerWidget {
                 child: AppButton(
                   label: 'Otra foto',
                   variant: AppButtonVariant.secondary,
-                  onPressed: () =>
-                      ref.read(scanControllerProvider.notifier).reset(),
+                  onPressed: () {
+                    // Esta foto se descartó, venga de donde venga: si era del
+                    // lote compartido, sale de la cola y sigue la próxima.
+                    ref.read(sharedImagesControllerProvider.notifier).done();
+                    ref.read(scanControllerProvider.notifier).reset();
+                  },
                 ),
               ),
               const SizedBox(width: 10),
@@ -378,11 +409,13 @@ class _Review extends ConsumerWidget {
                 child: AppButton(
                   label: 'Usar y revisar',
                   onPressed: () {
+                    // Cumplió: el borrador ya va camino de la boleta.
+                    ref.read(sharedImagesControllerProvider.notifier).done();
                     // La boleta se abre precargada; guardar sigue siendo un acto
                     // deliberado en la pantalla del plan 0002.
                     context.pushReplacement(
                       OrderCaptureScreen.path,
-                      extra: {'scan': result},
+                      extra: {'scan': result, 'customer': _customer},
                     );
                   },
                 ),
@@ -391,6 +424,125 @@ class _Review extends ConsumerWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+/// El cliente: la sugerencia del §7.5, o el alta prellenada si no hubo ninguna.
+///
+/// Es el único bloque de esta pantalla con botones, y por eso existe: todo lo
+/// demás se corrige después en la boleta, pero el cliente es lo que la boleta
+/// **no** puede prellenar sola, y resolverlo aquí —donde la foto está a la
+/// vista— ahorra el viaje al buscador con la boleta ya abierta.
+class _CustomerBlock extends StatelessWidget {
+  const _CustomerBlock({
+    required this.draft,
+    required this.chosen,
+    required this.onAccept,
+    required this.onRegister,
+    required this.onClear,
+  });
+
+  final ScanDraft draft;
+  final Customer? chosen;
+  final Future<void> Function(CustomerMatch) onAccept;
+  final VoidCallback onRegister;
+  final VoidCallback onClear;
+
+  @override
+  Widget build(BuildContext context) {
+    final name = draft.customerName.value;
+    final match = draft.customerMatch;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: AppRadius.lgAll,
+        border: Border.all(
+          color: chosen == null ? AppColors.border : AppColors.success,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Cliente',
+            style: AppTypography.h3.copyWith(
+              fontSize: 16,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 10),
+          if (chosen case final Customer customer) ...[
+            Row(
+              children: [
+                const Icon(
+                  Icons.check_circle_rounded,
+                  size: 19,
+                  color: AppColors.successText,
+                ),
+                const SizedBox(width: 9),
+                Expanded(
+                  child: Text(
+                    customer.fullName,
+                    style: AppTypography.bodySm.copyWith(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+                TextButton(onPressed: onClear, child: const Text('Cambiar')),
+              ],
+            ),
+            Text(
+              'La boleta se abre a su nombre. Podés cambiarlo ahí mismo.',
+              style: AppTypography.helper.copyWith(
+                color: AppColors.textSecondary,
+              ),
+            ),
+          ] else if (match case final CustomerMatch suggestion) ...[
+            _MatchNote(match: suggestion),
+            const SizedBox(height: 10),
+            AppButton(
+              label: 'Sí, es ${suggestion.fullName}',
+              fullWidth: true,
+              icon: const Icon(Icons.person_rounded, size: 17),
+              onPressed: () => onAccept(suggestion),
+            ),
+            const SizedBox(height: 8),
+            AppButton(
+              label: 'Es otra persona',
+              variant: AppButtonVariant.secondary,
+              fullWidth: true,
+              onPressed: onRegister,
+            ),
+          ] else if (name != null && name.trim().isNotEmpty) ...[
+            Text(
+              'Se leyó «$name» y no coincide con ningún cliente registrado. '
+              'Podés darlo de alta con lo que la boleta ya dice.',
+              style: AppTypography.bodySm.copyWith(
+                color: AppColors.textSecondary,
+              ),
+            ),
+            const SizedBox(height: 10),
+            AppButton(
+              label: 'Registrar a $name',
+              fullWidth: true,
+              icon: const Icon(Icons.person_add_alt_rounded, size: 17),
+              onPressed: onRegister,
+            ),
+          ] else
+            Text(
+              'De la foto no salió ningún nombre. El cliente se elige en la '
+              'boleta, con el buscador de siempre.',
+              style: AppTypography.bodySm.copyWith(
+                color: AppColors.textSecondary,
+              ),
+            ),
+        ],
+      ),
     );
   }
 }
@@ -441,10 +593,6 @@ class _Summary extends StatelessWidget {
             value: draft.customerName.value ?? '—',
             needsReview: draft.customerName.needsReview,
           ),
-          if (draft.customerMatch case final CustomerMatch match) ...[
-            const SizedBox(height: 8),
-            _MatchNote(match: match),
-          ],
           const SizedBox(height: 8),
           _Row(
             label: 'Boleta',

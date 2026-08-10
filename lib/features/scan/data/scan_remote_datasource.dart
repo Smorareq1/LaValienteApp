@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../core/network/api_client.dart';
+import '../models/cash_sheet.dart';
 import '../models/scan.dart';
 import '../models/ticket_lookup.dart';
 
@@ -67,6 +68,45 @@ class ScanRemoteDataSource {
   Future<ScanResult> get(String scanId) async {
     final response = await _dio.get<Map<String, dynamic>>('/scans/$scanId');
     return ScanResult.fromJson(response.data!);
+  }
+
+  /// Manda la foto de la hoja «Registro Diario» y devuelve lo que propone
+  /// hacerse con ella (plan 0005 §1).
+  ///
+  /// Tarda más que una boleta —es una página con hasta tres días y cuarenta y
+  /// cinco filas— así que se le da más margen. Sigue sin escribir nada: la
+  /// respuesta es una propuesta, y aplicarla es [applyCashSheet].
+  Future<CashSheetResult> scanCashSheet(
+    Uint8List image, {
+    String filename = 'cierre.jpg',
+  }) async {
+    final form = FormData.fromMap({
+      'file': MultipartFile.fromBytes(image, filename: filename),
+    });
+    final response = await _dio.post<Map<String, dynamic>>(
+      '/scans/cash-close',
+      data: form,
+      options: Options(receiveTimeout: const Duration(seconds: 90)),
+    );
+    return CashSheetResult.fromJson(response.data!);
+  }
+
+  /// Archiva lo que una persona confirmó de un día de la hoja.
+  ///
+  /// **En línea y sin outbox**, y aquí la razón es más fuerte que en el escaneo:
+  /// lo que se manda son cobros y entregas calculados contra saldos que el
+  /// servidor tenía hace un minuto. Encolarlos para aplicarlos mañana sería
+  /// cobrar contra saldos que ya no existen.
+  Future<CashSheetApplyResult> applyCashSheet(
+    String scanId,
+    CashSheetApply data,
+  ) async {
+    final response = await _dio.post<Map<String, dynamic>>(
+      '/scans/cash-close/$scanId/apply',
+      data: data.toJson(),
+      options: Options(receiveTimeout: const Duration(seconds: 90)),
+    );
+    return CashSheetApplyResult.fromJson(response.data!);
   }
 }
 

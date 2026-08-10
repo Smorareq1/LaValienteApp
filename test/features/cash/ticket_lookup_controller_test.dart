@@ -8,6 +8,7 @@ import 'package:la_valiente/features/cash/state/deliveries_controller.dart';
 import 'package:la_valiente/features/cash/state/ticket_lookup_controller.dart';
 import 'package:la_valiente/features/orders/models/order.dart';
 import 'package:la_valiente/features/scan/data/scan_remote_datasource.dart';
+import 'package:la_valiente/features/scan/models/cash_sheet.dart';
 import 'package:la_valiente/features/scan/models/scan.dart';
 import 'package:la_valiente/features/scan/models/ticket_lookup.dart';
 import 'package:la_valiente/features/scan/state/ticket_photo_picker.dart';
@@ -42,6 +43,18 @@ class _FakeScans implements ScanRemoteDataSource {
 
   @override
   Future<ScanResult> get(String scanId) => throw UnimplementedError();
+
+  @override
+  Future<CashSheetResult> scanCashSheet(
+    Uint8List image, {
+    String filename = 'cierre.jpg',
+  }) => throw UnimplementedError();
+
+  @override
+  Future<CashSheetApplyResult> applyCashSheet(
+    String scanId,
+    CashSheetApply data,
+  ) => throw UnimplementedError();
 }
 
 class _FakePicker implements TicketPhotoPicker {

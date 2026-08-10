@@ -11,6 +11,7 @@ import '../../../core/time/business_date.dart';
 import '../../auth/state/auth_controller.dart';
 import '../../auth/ui/widgets/permission_gate.dart';
 import '../../orders/models/order.dart';
+import '../../scan/ui/cash_sheet_scan_screen.dart';
 import '../../shell/ui/widgets/gradient_header.dart';
 import '../data/deliveries_repository.dart';
 import '../data/expenses_repository.dart';
@@ -1212,6 +1213,24 @@ class _CashFooter extends ConsumerWidget {
               child: _CloseDayRow(
                 closed: day.isClosed,
                 onTap: () => context.push('${DayCloseScreen.path}?date=${isoDate(date)}'),
+              ),
+            ),
+          ),
+          // El atajo del papel: la hoja «Registro Diario» fotografiada entra
+          // aquí, en la caja, que es donde se llevaría a mano. Detrás de su
+          // permiso, porque importa quince cobros de un tirón.
+          PermissionGate(
+            anyOf: const [AppPermissions.scansImportClose],
+            child: Padding(
+              padding: const EdgeInsets.only(bottom: 9),
+              child: AppButton(
+                label: 'Importar hoja del día',
+                icon: const Icon(Icons.document_scanner_outlined),
+                variant: AppButtonVariant.outline,
+                fullWidth: true,
+                onPressed: day.isClosed
+                    ? null
+                    : () => context.push(CashSheetScanScreen.path),
               ),
             ),
           ),
