@@ -20,6 +20,15 @@ abstract final class AppGradients {
     stops: [0.0, 0.45, 1.3],
   );
 
+  /// Cabecera del shell autenticado:
+  /// linear-gradient(135deg, #E2168B 0%, #C51379 52%, #49C5F3 145%).
+  static const LinearGradient shellHeader = LinearGradient(
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+    colors: [AppColors.primary500, AppColors.primary600, AppColors.secondary500],
+    stops: [0.0, 0.52, 1.45],
+  );
+
   /// Cabecera de app bar: linear-gradient(120deg, #E2168B, #C51379).
   static const LinearGradient appBar = LinearGradient(
     begin: Alignment.topLeft,

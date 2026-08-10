@@ -23,6 +23,27 @@ abstract final class AppShadows {
     ),
   ];
 
+  /// Sombra de las tarjetas de contenido sobre fondo gris
+  /// (`0 10px 26px -20px rgba(22,24,29,.5)`).
+  static const List<BoxShadow> card = [
+    BoxShadow(
+      color: Color(0x8016181D),
+      offset: Offset(0, 10),
+      blurRadius: 26,
+      spreadRadius: -20,
+    ),
+  ];
+
+  /// Sombra de la bottom nav, que proyecta hacia arriba.
+  static const List<BoxShadow> bottomNav = [
+    BoxShadow(
+      color: Color(0x4D000000),
+      offset: Offset(0, -8),
+      blurRadius: 24,
+      spreadRadius: -16,
+    ),
+  ];
+
   /// Sombra de marca (magenta) para elementos destacados.
   static const List<BoxShadow> brand = [
     BoxShadow(

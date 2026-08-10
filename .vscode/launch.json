@@ -1,0 +1,30 @@
+{
+  // El backend se elige en compilacion (Env.apiBaseUrl es String.fromEnvironment).
+  // La direccion vive en dev.json, que NO se versiona: este repositorio es
+  // publico. Copia dev.json.example a dev.json la primera vez.
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "App (backend de dev.json)",
+      "request": "launch",
+      "type": "dart",
+      "program": "lib/main.dart",
+      "args": ["--dart-define-from-file", "dev.json"]
+    },
+    {
+      "name": "App (emulador Android)",
+      "request": "launch",
+      "type": "dart",
+      "program": "lib/main.dart",
+      // 10.0.2.2 es el localhost del host visto desde el emulador de Android.
+      "args": ["--dart-define", "API_BASE_URL=http://10.0.2.2:8000"]
+    },
+    {
+      "name": "App (backend en esta maquina)",
+      "request": "launch",
+      "type": "dart",
+      "program": "lib/main.dart",
+      "args": ["--dart-define", "API_BASE_URL=http://localhost:8000"]
+    }
+  ]
+}

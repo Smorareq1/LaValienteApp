@@ -12,4 +12,11 @@ abstract final class Env {
   static const String apiV1Prefix = '/api/v1';
 
   static String get apiV1BaseUrl => '$apiBaseUrl$apiV1Prefix';
+
+  /// Versión que la app reporta al registrar el dispositivo (plan 0004 §6.2).
+  /// Se inyecta en el build: `--dart-define=APP_VERSION=1.2.0`.
+  static const String appVersion = String.fromEnvironment(
+    'APP_VERSION',
+    defaultValue: '1.0.0',
+  );
 }

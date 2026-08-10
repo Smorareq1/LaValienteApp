@@ -19,19 +19,29 @@ DioException _dioError({
 
 void main() {
   group('AppFailure.fromException', () {
-    test('timeouts y errores de conexión → NetworkFailure', () {
-      expect(
-        AppFailure.fromException(
-          _dioError(type: DioExceptionType.connectionTimeout),
-        ),
-        isA<NetworkFailure>(),
-      );
+    test('no alcanzar el servidor → NetworkFailure', () {
       expect(
         AppFailure.fromException(
           _dioError(type: DioExceptionType.connectionError),
         ),
         isA<NetworkFailure>(),
       );
+    });
+
+    test('los timeouts se separan de la falta de red', () {
+      // Mandar a revisar el wifi a quien tiene el wifi bien lo pone a buscar un
+      // problema que no existe: aquí lo que hay que hacer es reintentar.
+      for (final type in [
+        DioExceptionType.connectionTimeout,
+        DioExceptionType.sendTimeout,
+        DioExceptionType.receiveTimeout,
+      ]) {
+        expect(
+          AppFailure.fromException(_dioError(type: type)),
+          isA<TimeoutFailure>(),
+          reason: '$type debería ser un timeout',
+        );
+      }
     });
 
     test('401 → AuthFailure con el detail del backend', () {

@@ -12,9 +12,14 @@ sealed class AppFailure {
     if (error is AppFailure) return error;
     if (error is DioException) {
       switch (error.type) {
+        // Que el servidor tarde y que no se le pueda alcanzar son cosas
+        // distintas, y confundirlas manda a revisar el wifi a quien tiene el
+        // wifi perfecto. El primero se espera o se reintenta; el segundo se
+        // arregla en el teléfono.
         case DioExceptionType.connectionTimeout:
         case DioExceptionType.sendTimeout:
         case DioExceptionType.receiveTimeout:
+          return const TimeoutFailure();
         case DioExceptionType.connectionError:
           return const NetworkFailure();
         case DioExceptionType.badResponse:
@@ -43,9 +48,27 @@ sealed class AppFailure {
   }
 }
 
-/// Timeout o pérdida de conexión de red.
+/// No se pudo alcanzar el servidor: no hay red, o no está donde se le busca.
 final class NetworkFailure extends AppFailure {
   const NetworkFailure([super.message = 'Sin conexión con el servidor']);
+}
+
+/// El servidor está ahí pero no contestó a tiempo.
+///
+/// Se separa de [NetworkFailure] porque la acción es otra: aquí se espera y se
+/// reintenta, y decirle a alguien que revise su red lo manda a buscar un
+/// problema que no tiene.
+final class TimeoutFailure extends AppFailure {
+  const TimeoutFailure([super.message = 'El servidor tardó demasiado en responder']);
+}
+
+/// El teléfono está sin señal y no puede resolver el intento por su cuenta.
+///
+/// Lleva su propio mensaje porque cada caso explica algo distinto: que en este
+/// aparato solo puede entrar quien ya entró, o que lleva demasiado sin verse
+/// con el servidor.
+final class OfflineLoginFailure extends AppFailure {
+  const OfflineLoginFailure(super.message);
 }
 
 /// Error explícito devuelto por el backend.
