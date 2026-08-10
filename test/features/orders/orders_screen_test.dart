@@ -187,6 +187,16 @@ void main() {
     return (await database.select(database.orderEntries).get()).single.id;
   }
 
+  /// Recorre la cadena hasta `listo`, que es donde el detalle empieza a ofrecer
+  /// dinero: cobrar y entregar no salen mientras la ropa esté en la lavadora
+  /// (§5.4). Caja sí entrega desde cualquier estado, y eso se prueba allá.
+  Future<void> markReady(String id) async {
+    for (final status in const [OrderStatus.inProgress, OrderStatus.ready]) {
+      final order = (await orders.detail(id))!;
+      expect((await orders.changeStatus(order, status)).isRight(), isTrue);
+    }
+  }
+
   /// Un acta que cierra [date], como la que baja del feed cuando alguien cerró
   /// el día desde otro dispositivo.
   Future<void> seedClosure(String date) async {
@@ -244,6 +254,37 @@ void main() {
             validFrom: '2020-01-01',
           ),
         );
+    // Un segundo servicio, suelto y por unidad: es el que se le suma a una
+    // boleta que ya está en el taller ("y además un secado").
+    await database
+        .into(database.serviceTypeEntries)
+        .insert(
+          ServiceTypeEntriesCompanion.insert(
+            id: 'st-dry',
+            code: 'dry',
+            name: 'Secado',
+            pricingMode: 'per_unit',
+            sortOrder: const Value(1),
+          ),
+        );
+    await database
+        .into(database.servicePriceEntries)
+        .insert(
+          ServicePriceEntriesCompanion.insert(
+            id: 'sp-dry',
+            serviceTypeId: 'st-dry',
+            price: '20.00',
+            validFrom: '2020-01-01',
+          ),
+        );
+  }
+
+  /// Toca el `+` de la fila que contiene [label], igual que en la toma de pedido:
+  /// el stepper es hermano del nombre.
+  Future<void> addOne(WidgetTester tester, String label) async {
+    final row = find.ancestor(of: find.text(label), matching: find.byType(Row)).first;
+    await tester.tap(find.descendant(of: row, matching: find.byIcon(Icons.add_rounded)));
+    await tester.pumpAndSettle();
   }
 
   Future<void> openOrders(
@@ -360,8 +401,45 @@ void main() {
       expect(find.text('Motivo: boleta duplicada'), findsOneWidget);
     });
 
+    orderTest('la cadena se recorre de un paso a la vez', (tester) async {
+      // Lo que la pantalla ofrece es **el siguiente paso**, no los cuatro: en
+      // `recibido` no se cobra ni se entrega, porque la ropa está en la lavadora.
+      final id = await seedOrder();
+      await openOrders(tester);
+
+      await tester.tap(find.text('Ana Pérez'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Pasar a proceso'), findsOneWidget);
+      expect(find.text('Cobrar'), findsNothing);
+      expect(find.text('Entregar pedido'), findsNothing);
+
+      await tester.tap(find.text('Pasar a proceso'));
+      await tester.pumpAndSettle();
+      // El aviso de que se avanzó vive abajo, sobre la barra de acciones: hay
+      // que dejarlo irse antes de tocar el paso siguiente.
+      await tester.pump(const Duration(seconds: 5));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Marcar listo'), findsOneWidget);
+      expect(find.text('Cobrar'), findsNothing);
+      expect(find.text('Entregar pedido'), findsNothing);
+
+      await tester.tap(find.text('Marcar listo'));
+      await tester.pumpAndSettle();
+      await tester.pump(const Duration(seconds: 5));
+      await tester.pumpAndSettle();
+
+      // Con la ropa lista sí: primero cobrar, después entregar.
+      expect(find.text('Cobrar'), findsOneWidget);
+      expect(find.text('Entregar pedido'), findsOneWidget);
+      expect(find.text('Marcar listo'), findsNothing);
+      expect((await orders.detail(id))!.status, OrderStatus.ready);
+    });
+
     orderTest('registrar un pago baja el saldo en la misma pantalla', (tester) async {
-      await seedOrder();
+      final id = await seedOrder();
+      await markReady(id);
       await openOrders(tester);
 
       await tester.tap(find.text('Ana Pérez'));
@@ -383,7 +461,8 @@ void main() {
     });
 
     orderTest('cobrar de más se rechaza antes de mandarlo', (tester) async {
-      await seedOrder();
+      final id = await seedOrder();
+      await markReady(id);
       await openOrders(tester);
 
       await tester.tap(find.text('Ana Pérez'));
@@ -503,12 +582,9 @@ void main() {
       final id = await seedOrder(advance: const PaymentDraft(amount: 3000));
       await openOrders(tester);
 
-      // Se recorre la cadena, que sigue existiendo aunque entregar ya no la
-      // exija (plan 0001 D13).
-      var order = (await orders.detail(id))!;
-      await orders.changeStatus(order, OrderStatus.inProgress);
-      order = (await orders.detail(id))!;
-      await orders.changeStatus(order, OrderStatus.ready);
+      // Se recorre la cadena: en esta pantalla entregar espera a que la ropa
+      // esté lista. La entrega sin recorrerla es la de Caja (plan 0001 D13).
+      await markReady(id);
       await tester.pumpAndSettle();
 
       await tester.tap(find.text('Ana Pérez'));
@@ -595,6 +671,36 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Editar'), findsNothing);
+    });
+
+    orderTest('un pedido en proceso suma un secado desde el catálogo', (tester) async {
+      // El caso del cliente: la ropa ya entró y alguien decide que además va un
+      // secado. Se abre la lista del catálogo, no la boleta entera.
+      await seedCatalog();
+      final id = await seedOrder();
+      await orders.changeStatus((await orders.detail(id))!, OrderStatus.inProgress);
+      await openOrders(tester);
+
+      await tester.tap(find.text('Ana Pérez'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Agregar servicios'));
+      await tester.pumpAndSettle();
+
+      // Lo que ya lleva sale marcado: la tina que se cobró al capturarla.
+      expect(find.text('1 × Q30.00 = Q30.00'), findsOneWidget);
+
+      await addOne(tester, 'Secado');
+      expect(find.text('1 × Q20.00 = Q20.00'), findsOneWidget);
+
+      await tester.tap(find.text('Guardar servicios'));
+      await tester.pumpAndSettle();
+
+      final order = (await orders.detail(id))!;
+      expect(order.charges.length, 2);
+      expect(order.total, 5000);
+      // Y no perdió nada de la boleta por el camino.
+      expect(order.garments.single.quantity, 3);
+      expect(order.status, OrderStatus.inProgress);
     });
 
     orderTest('sin el permiso de admin, un pedido listo no se edita', (tester) async {

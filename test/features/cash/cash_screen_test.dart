@@ -335,22 +335,20 @@ void main() {
       expect(find.text('saldo'), findsOneWidget);
     });
 
-    cashTest('marcar una boleta ofrece registrarla, y hacerlo la entrega', (
-      tester,
-    ) async {
+    cashTest('tocar la boleta la entrega y la cobra de una vez', (tester) async {
       await seedOpenOrder(id: 'p-1', serial: 'B-000144', name: 'Sonia Pérez');
       await openCash(tester);
 
       await tester.tap(find.text('Sonia Pérez'));
       await tester.pumpAndSettle();
-      expect(find.text('1 boleta marcada · Q80.00'), findsOneWidget);
 
-      await tester.tap(find.widgetWithText(AppButton, 'Registrar'));
-      await tester.pumpAndSettle();
-      expect(find.text('Registrar 1 entrega'), findsOneWidget);
-      expect(find.text('Entra a caja'), findsOneWidget);
+      // La hoja de una boleta: las dos preguntas del papel, en su orden.
+      expect(find.text('Entregar B-000144'), findsOneWidget);
+      expect(find.text('¿CUÁNTO PAGÓ?'), findsOneWidget);
+      expect(find.text('¿CÓMO PAGÓ?'), findsOneWidget);
+      expect(find.text('Entran Q80.00 a la caja de hoy'), findsOneWidget);
 
-      await tester.tap(find.widgetWithText(AppButton, 'Entregar'));
+      await tester.tap(find.widgetWithText(AppButton, 'Cobrar y entregar'));
       await tester.pumpAndSettle();
 
       // La boleta se cerró y su cobro es un ingreso del día.
@@ -362,7 +360,75 @@ void main() {
 
       final payments = await database.select(database.orderPaymentEntries).get();
       expect(payments.single.amount, '80.00');
+      expect(payments.single.method, 'cash');
       expect(payments.single.isAdvance, isFalse);
+
+      // Y ya no está entre las pendientes: entregada es entregada.
+      expect(find.text('No queda ropa pendiente de entregar.'), findsOneWidget);
+    });
+
+    cashTest('el cliente que paga una parte queda entregado con saldo', (tester) async {
+      await seedOpenOrder(id: 'p-1', serial: 'B-000144', name: 'Sonia Pérez');
+      await openCash(tester);
+
+      await tester.tap(find.text('Sonia Pérez'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Queda debiendo'));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.descendant(
+          of: find.ancestor(
+            of: find.text('PAGA AHORA'),
+            matching: find.byType(AppFormField),
+          ),
+          matching: find.byType(TextField),
+        ),
+        '50',
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Queda debiendo Q30.00'), findsOneWidget);
+
+      await tester.tap(find.widgetWithText(AppButton, 'Entregar con saldo'));
+      await tester.pumpAndSettle();
+
+      final order = await (database.select(
+        database.orderEntries,
+      )..where((row) => row.id.equals('p-1'))).getSingle();
+      expect(order.status, 'delivered');
+
+      // Entra lo que pagó, no el saldo entero: los Q30 quedan a deber.
+      final payments = await database.select(database.orderPaymentEntries).get();
+      expect(payments.single.amount, '50.00');
+    });
+
+    cashTest('la casilla marca para el repaso en lote del cierre', (tester) async {
+      await seedOpenOrder(id: 'p-1', serial: 'B-000144', name: 'Sonia Pérez');
+      await openCash(tester);
+
+      await tester.tap(find.byKey(const ValueKey('mark-p-1')));
+      await tester.pumpAndSettle();
+      expect(find.text('1 boleta marcada · Q80.00'), findsOneWidget);
+
+      await tester.tap(find.widgetWithText(AppButton, 'Registrar'));
+      await tester.pumpAndSettle();
+      expect(find.text('Registrar 1 entrega'), findsOneWidget);
+      expect(find.text('Entra a caja'), findsOneWidget);
+
+      await tester.tap(find.widgetWithText(AppButton, 'Entregar'));
+      await tester.pumpAndSettle();
+
+      final order = await (database.select(
+        database.orderEntries,
+      )..where((row) => row.id.equals('p-1'))).getSingle();
+      expect(order.status, 'delivered');
+
+      final payments = await database.select(database.orderPaymentEntries).get();
+      expect(payments.single.amount, '80.00');
+      expect(payments.single.isAdvance, isFalse);
+
+      // Y deja de estar marcada: lo que ya salió no puede seguir contando.
+      expect(find.textContaining('boleta marcada'), findsNothing);
     });
 
     cashTest('el buscador filtra por número de boleta', (tester) async {

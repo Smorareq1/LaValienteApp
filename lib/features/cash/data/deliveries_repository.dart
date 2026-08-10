@@ -7,22 +7,29 @@ import '../models/delivery_line.dart';
 
 part 'deliveries_repository.g.dart';
 
-/// Cómo terminó el repaso: cuántas boletas salieron, cuánto entró y qué no pudo.
+/// Cómo terminó el repaso: cuáles boletas salieron, cuánto entró y qué no pudo.
 class DeliveryOutcome {
   const DeliveryOutcome({
-    required this.delivered,
+    required this.deliveredIds,
     required this.collected,
     required this.failures,
   });
 
-  /// Boletas que quedaron entregadas.
-  final int delivered;
+  /// Ids de los pedidos que quedaron entregados.
+  ///
+  /// Van los ids y no solo el conteo porque quien llamó tiene que poder
+  /// desmarcar **exactamente** lo que salió: en un lote donde una boleta falla,
+  /// desmarcarlo todo perdería la que hay que reintentar y no desmarcar nada
+  /// dejaría marcadas boletas ya entregadas.
+  final List<String> deliveredIds;
 
   /// Centavos que entraron a la caja.
   final int collected;
 
   /// Una línea por boleta que no se pudo, ya con su porqué en español.
   final List<String> failures;
+
+  int get delivered => deliveredIds.length;
 
   bool get isClean => failures.isEmpty;
 }
@@ -48,7 +55,7 @@ class DeliveriesRepository {
     List<DeliveryLine> lines, {
     required String actorId,
   }) async {
-    var delivered = 0;
+    final delivered = <String>[];
     var collected = 0;
     final failures = <String>[];
 
@@ -82,14 +89,14 @@ class DeliveriesRepository {
       result.match(
         (failure) => failures.add('${line.label}: ${failure.message}'),
         (_) {
-          delivered++;
+          delivered.add(line.orderId);
           collected += line.amount;
         },
       );
     }
 
     return DeliveryOutcome(
-      delivered: delivered,
+      deliveredIds: delivered,
       collected: collected,
       failures: failures,
     );

@@ -80,6 +80,34 @@ Future<void> _open(WidgetTester tester, _FakeRemote remote, Widget sheet) async 
   await tester.pumpAndSettle();
 }
 
+/// Abre la sheet como se abre de verdad —modal, con su alto máximo y su barra de
+/// acciones fija— y en una pantalla de teléfono. El scroll solo existe en ese
+/// contexto: montada suelta en un `Scaffold` de 1600 de alto no hay nada que
+/// desplazar, y por eso este defecto vivió tanto.
+Future<void> _openOnPhone(WidgetTester tester, _FakeRemote remote) async {
+  tester.view.physicalSize = const Size(360, 640);
+  tester.view.devicePixelRatio = 1;
+  addTearDown(tester.view.reset);
+
+  await tester.pumpWidget(
+    ProviderScope(
+      overrides: [inventoryRemoteDataSourceProvider.overrideWithValue(remote)],
+      child: MaterialApp(
+        home: Scaffold(
+          body: Builder(
+            builder: (context) => TextButton(
+              onPressed: () => LotFormSheet.show(context, product: _product),
+              child: const Text('Abrir'),
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
+  await tester.tap(find.text('Abrir'));
+  await tester.pumpAndSettle();
+}
+
 void main() {
   group('alta de producto', () {
     testWidgets('sin nombre ni unidad no se crea nada', (tester) async {
@@ -180,6 +208,30 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(remote.lots.single.expense, isNull);
+    });
+
+    testWidgets('el total de la compra se alcanza arrastrando la sheet', (
+      tester,
+    ) async {
+      // En el mostrador el TOTAL queda bajo el pliegue, y la sheet no rodaba: la
+      // lista de adentro se quedaba con el gesto de arrastre sin tener nada que
+      // desplazar, así que el campo era inalcanzable y el gasto no se podía
+      // corregir.
+      final remote = _FakeRemote();
+      await _openOnPhone(tester, remote);
+
+      const screen = 640.0;
+      final total = find.text('TOTAL DE LA COMPRA');
+      expect(
+        tester.getTopLeft(total).dy,
+        greaterThan(screen),
+        reason: 'el total tiene que arrancar fuera de la pantalla',
+      );
+
+      await tester.drag(find.text('CANTIDAD RECIBIDA'), const Offset(0, -400));
+      await tester.pumpAndSettle();
+
+      expect(tester.getTopLeft(total).dy, lessThan(screen));
     });
 
     testWidgets('sin cantidad no se registra nada', (tester) async {

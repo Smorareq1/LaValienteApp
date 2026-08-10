@@ -28,14 +28,27 @@ class OrderSavedSheet extends StatelessWidget {
   /// Arma el comprobante y lo entrega al share sheet del sistema (§17.1), que
   /// es por donde sale WhatsApp. La sheet no se cierra: compartir es una cosa
   /// que se hace **además** de seguir, no en lugar de.
+  ///
+  /// Va con el cliente, sus datos, las prendas y la hora de recepción: el
+  /// mensaje es el resguardo de lo que dejó, y con solo el total no se puede
+  /// cotejar nada al recogerlo.
   Future<void> _share(BuildContext context) async {
     final box = context.findRenderObject() as RenderBox?;
+    final at = order.receivedAt?.toLocal();
     await Share.share(
       orderReceipt(
         reference: order.reference,
         total: order.total,
         paid: order.paid,
         date: formatBusinessDate(businessDate()),
+        time: at == null
+            ? null
+            : '${at.hour.toString().padLeft(2, '0')}:'
+                  '${at.minute.toString().padLeft(2, '0')}',
+        customerName: order.customerName,
+        customerPhone: order.customerPhone,
+        customerNit: order.customerNit,
+        garments: order.garments,
         pendingSync: order.pendingSync,
       ),
       // iPad ancla el menú a un rectángulo; sin esto revienta ahí y en ningún
@@ -66,25 +79,28 @@ class OrderSavedSheet extends StatelessWidget {
             onPressed: () => _share(context),
           ),
           const SizedBox(height: 9),
+          // «Listo» es el que cierra el trámite y por eso lleva el magenta y el
+          // sitio del pulgar: tomar otra boleta seguida es la excepción, no lo
+          // que pasa después de cada pedido.
           Row(
             children: [
               Expanded(
                 child: AppButton(
-                  label: 'Listo',
-                  variant: AppButtonVariant.outline,
+                  label: 'Nuevo pedido',
+                  variant: AppButtonVariant.ghost,
+                  icon: const Icon(Icons.add_rounded),
                   fullWidth: true,
-                  onPressed: () => Navigator.of(context).pop(false),
+                  onPressed: () => Navigator.of(context).pop(true),
                 ),
               ),
               const SizedBox(width: 9),
               Expanded(
                 flex: 2,
                 child: AppButton(
-                  label: 'Nuevo pedido',
-                  icon: const Icon(Icons.add_rounded),
+                  label: 'Listo',
                   fullWidth: true,
                   elevated: true,
-                  onPressed: () => Navigator.of(context).pop(true),
+                  onPressed: () => Navigator.of(context).pop(false),
                 ),
               ),
             ],

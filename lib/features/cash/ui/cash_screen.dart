@@ -12,6 +12,7 @@ import '../../auth/state/auth_controller.dart';
 import '../../auth/ui/widgets/permission_gate.dart';
 import '../../orders/models/order.dart';
 import '../../shell/ui/widgets/gradient_header.dart';
+import '../data/deliveries_repository.dart';
 import '../data/expenses_repository.dart';
 import '../domain/cash_day.dart';
 import '../models/cash_entry.dart';
@@ -23,6 +24,7 @@ import '../state/ticket_lookup_controller.dart';
 import 'day_close_screen.dart';
 import 'supply_sale_screen.dart';
 import 'widgets/delivery_batch_sheet.dart';
+import 'widgets/delivery_ticket_sheet.dart';
 import 'widgets/expense_sheet.dart';
 
 /// Caja del día (Plan 0006 §7.1): la hoja de Registro Diario en pantalla.
@@ -476,6 +478,44 @@ class _DeliveriesCardState extends ConsumerState<_DeliveriesCard> {
     );
   }
 
+  /// Entrega **una** boleta, que es lo que pasa cuando el cliente está enfrente:
+  /// se abre su hoja, se dice cuánto y cómo pagó, y sale del listado.
+  ///
+  /// El lote sigue existiendo para el repaso del cierre; esto es el camino
+  /// ordinario, y por eso es lo que hace tocar la fila.
+  Future<void> _deliverOne(OrderListItem order) async {
+    final line = await DeliveryTicketSheet.show(context, order);
+    if (line == null || !mounted) return;
+
+    final user = ref.read(authControllerProvider).valueOrNull;
+    if (user == null) return;
+
+    final outcome = await ref
+        .read(deliveriesRepositoryProvider)
+        .deliverAll([line], actorId: user.id);
+    if (!mounted) return;
+
+    // Lo que salió se desmarca: pudo estar marcada de antes —la escaneó alguien
+    // barriendo la pila— y una boleta ya entregada no puede seguir contando en
+    // el lote.
+    ref.read(deliverySelectionProvider.notifier).forget(outcome.deliveredIds);
+
+    if (!outcome.isClean) {
+      _say(context, outcome.failures.first);
+      return;
+    }
+    // Lo que entró y lo que quedó a deber se dicen los dos: el saldo que queda
+    // abierto es lo que alguien va a tener que cobrar otro día.
+    _say(
+      context,
+      [
+        'Entregada la ${line.label}',
+        if (outcome.collected > 0) '+Q${Fixed2.format(outcome.collected)} en caja',
+        if (line.isPartial) 'queda debiendo Q${Fixed2.format(line.pending)}',
+      ].join(' · '),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final open = ref.watch(openOrdersProvider).valueOrNull ?? const <OrderListItem>[];
@@ -540,8 +580,8 @@ class _DeliveriesCardState extends ConsumerState<_DeliveriesCard> {
               ),
               const SizedBox(height: 10),
               Text(
-                'Marca las que entregaste. La boleta se cierra al entregarla: no hay '
-                'que pasarla por «en proceso» ni «lista».',
+                'Tocá la boleta para entregarla y cobrarla. La casilla es para el '
+                'repaso del cierre: marcá varias y registralas juntas.',
                 style: AppTypography.helper.copyWith(fontSize: 11.5),
               ),
               if (open.isEmpty)
@@ -560,7 +600,8 @@ class _DeliveriesCardState extends ConsumerState<_DeliveriesCard> {
                   _OpenOrderRow(
                     order: order,
                     marked: selection.containsKey(order.id),
-                    onTap: () =>
+                    onTap: () => _deliverOne(order),
+                    onMark: () =>
                         ref.read(deliverySelectionProvider.notifier).toggle(order),
                   ),
                 if (!_showAll && matches.length > _preview)
@@ -667,16 +708,28 @@ class _ScanTicketButton extends ConsumerWidget {
   }
 }
 
+/// Una boleta abierta, con dos toques distintos a propósito.
+///
+/// La fila entera **entrega**: es el gesto de todos los días, con el cliente
+/// enfrente pidiendo su ropa. La casilla solo **marca** para el repaso en lote
+/// del cierre. Son dos cosas y por eso son dos blancos: tocar una boleta y que
+/// se marque en silencio es cómo alguien se va creyendo que ya la entregó.
 class _OpenOrderRow extends StatelessWidget {
   const _OpenOrderRow({
     required this.order,
     required this.marked,
     required this.onTap,
+    required this.onMark,
   });
 
   final OrderListItem order;
   final bool marked;
+
+  /// Abre la hoja de la boleta: entregar y cobrar.
   final VoidCallback onTap;
+
+  /// Marca o desmarca para el lote.
+  final VoidCallback onMark;
 
   @override
   Widget build(BuildContext context) {
@@ -691,22 +744,33 @@ class _OpenOrderRow extends StatelessWidget {
         padding: const EdgeInsets.symmetric(vertical: 9),
         child: Row(
           children: [
-            Container(
-              width: 24,
-              height: 24,
-              decoration: BoxDecoration(
-                color: marked ? AppColors.primary : AppColors.white,
-                border: Border.all(
-                  color: marked ? AppColors.primary : AppColors.gray300,
-                  width: 2,
+            // El blanco de la casilla es más grande que la casilla: 24 px de
+            // borde a borde son la mitad de lo que necesita un pulgar, y fallarlo
+            // acabaría abriendo la hoja de entrega.
+            InkWell(
+              key: ValueKey('mark-${order.id}'),
+              onTap: onMark,
+              borderRadius: BorderRadius.circular(10),
+              child: Padding(
+                padding: const EdgeInsets.all(6),
+                child: Container(
+                  width: 24,
+                  height: 24,
+                  decoration: BoxDecoration(
+                    color: marked ? AppColors.primary : AppColors.white,
+                    border: Border.all(
+                      color: marked ? AppColors.primary : AppColors.gray300,
+                      width: 2,
+                    ),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: marked
+                      ? const Icon(Icons.check_rounded, size: 15, color: AppColors.white)
+                      : null,
                 ),
-                borderRadius: BorderRadius.circular(8),
               ),
-              child: marked
-                  ? const Icon(Icons.check_rounded, size: 15, color: AppColors.white)
-                  : null,
             ),
-            const SizedBox(width: 11),
+            const SizedBox(width: 5),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,

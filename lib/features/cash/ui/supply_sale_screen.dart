@@ -138,10 +138,17 @@ class _SupplySaleScreenState extends ConsumerState<SupplySaleScreen> {
       appBar: AppBar(
         backgroundColor: AppColors.white,
         surfaceTintColor: AppColors.white,
+        // El tema pinta los iconos de la AppBar en blanco porque casi todas van
+        // sobre el magenta; esta va sobre blanco, así que hay que decirlo o el
+        // botón de salir queda invisible y solo queda el back del teléfono.
+        foregroundColor: AppColors.textPrimary,
         title: const Text('Venta de insumo'),
         titleTextStyle: AppTypography.h3.copyWith(fontSize: 17),
+        // Una X y no una flecha: esto no es un paso del que se vuelve, es una
+        // venta que se abandona. Es la misma salida que la hoja de un gasto.
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_rounded),
+          icon: const Icon(Icons.close_rounded),
+          tooltip: 'Cerrar',
           onPressed: () => context.pop(),
         ),
       ),

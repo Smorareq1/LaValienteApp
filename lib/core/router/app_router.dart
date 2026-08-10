@@ -27,6 +27,7 @@ import '../../features/orders/models/order.dart';
 import '../../features/orders/ui/order_capture_screen.dart';
 import '../../features/orders/ui/order_detail_screen.dart';
 import '../../features/orders/ui/order_deliver_screen.dart';
+import '../../features/orders/ui/order_services_screen.dart';
 import '../../features/orders/ui/orders_screen.dart';
 import '../../features/promotions/ui/promotions_screen.dart';
 import '../../features/scan/models/scan.dart';
@@ -310,6 +311,15 @@ GoRouter appRouter(Ref ref) {
                         path: 'deliver',
                         builder: (context, state) =>
                             OrderDeliverScreen(orderId: state.pathParameters['id']!),
+                      ),
+                      // Sumar servicios a una boleta viva. El permiso lo aplica
+                      // el botón del detalle —que distingue un pedido listo de
+                      // uno en proceso— y el RBAC del servidor al aplicar la
+                      // operación, igual que con «Editar».
+                      GoRoute(
+                        path: 'services',
+                        builder: (context, state) =>
+                            OrderServicesScreen(orderId: state.pathParameters['id']!),
                       ),
                     ],
                   ),

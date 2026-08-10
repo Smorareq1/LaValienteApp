@@ -1,3 +1,4 @@
+import 'package:design_system/design_system.dart';
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -13,6 +14,7 @@ import 'package:la_valiente/features/customers/data/customers_local_datasource.d
 import 'package:la_valiente/features/customers/data/customers_repository.dart';
 import 'package:la_valiente/features/orders/data/orders_local_datasource.dart';
 import 'package:la_valiente/features/orders/data/orders_repository.dart';
+import 'package:la_valiente/features/orders/ui/widgets/order_saved_sheet.dart';
 import 'package:la_valiente/features/promotions/data/promotion_mirror.dart';
 import 'package:la_valiente/features/sync/data/sync_local_datasource.dart';
 import 'package:la_valiente/features/sync/data/sync_remote_datasource.dart';
@@ -395,21 +397,108 @@ void main() {
     ]);
   });
 
-  captureTest('el NIT del cliente se prellena en el encabezado', (tester) async {
+  /// El campo de NIT, que vive en la sección del cliente y solo existe cuando
+  /// hay uno elegido.
+  Finder nitField() => find.descendant(
+    of: find.byKey(const ValueKey('nit-field')),
+    matching: find.byType(TextField),
+  );
+
+  String? readNit(WidgetTester tester) =>
+      tester.widget<TextField>(nitField()).controller?.text;
+
+  captureTest('el NIT sale del cliente y aparece con él', (tester) async {
     await seedCatalog();
     await customers.create(fullName: 'Ana Pérez', nit: '1234567-8');
 
     await openCapture(tester);
+    // Sin cliente no hay NIT que enseñar: es un dato de él.
+    expect(nitField(), findsNothing);
+
+    await pickCustomer(tester, 'Ana Pérez');
+    expect(readNit(tester), '1234567-8');
+    // Con la sección cerrada, el resumen dice a quién y con qué NIT se factura.
+    expect(find.text('Ana Pérez · NIT 1234567-8'), findsOneWidget);
+
+    // Soltar al cliente se lleva el campo y el dato.
+    await tester.tap(find.text('Cambiar'));
+    await tester.pumpAndSettle();
+    expect(nitField(), findsNothing);
+    expect(find.text('Sin cliente seleccionado'), findsOneWidget);
+  });
+
+  captureTest('un cliente sin NIT registrado entra como CF', (tester) async {
+    // Es lo que se le factura a quien no da NIT, y es la mayoría: tenerlo que
+    // teclear en cada boleta es el trabajo que esto quita.
+    await seedCatalog();
+    await customers.create(fullName: 'Ana Pérez');
+
+    await openCapture(tester);
     await pickCustomer(tester, 'Ana Pérez');
 
-    // La sección 1 arranca cerrada; su resumen ya dice lo capturado.
-    await tester.tap(find.text('Encabezado'));
+    expect(readNit(tester), 'CF');
+  });
+
+  captureTest('limpiar la boleta pregunta antes de borrarla', (tester) async {
+    // El botón vive al pie de la lista, donde cae el pulgar al terminar de
+    // contar prendas, y lo que borra no está guardado en ninguna parte.
+    await seedCatalog();
+    await openCapture(tester);
+
+    await addOne(tester, 'Camisa');
+    expect(find.text('1 tipo de prenda'), findsOneWidget);
+
+    await tester.tap(find.text('Limpiar boleta'));
+    await tester.pumpAndSettle();
+    expect(find.text('¿Limpiar la boleta?'), findsOneWidget);
+
+    await tester.tap(find.text('Seguir capturando'));
+    await tester.pumpAndSettle();
+    expect(find.text('1 tipo de prenda'), findsOneWidget);
+
+    await tester.tap(find.text('Limpiar boleta'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Limpiar'));
     await tester.pumpAndSettle();
 
-    final nitField = find.descendant(
-      of: find.byKey(const ValueKey('nit-field')),
-      matching: find.byType(TextField),
+    expect(find.text('Ninguna prenda agregada'), findsOneWidget);
+  });
+
+  captureTest('la confirmación lleva lo que va en el comprobante', (tester) async {
+    await seedCatalog();
+    await customers.create(fullName: 'Ana Pérez', phone: '5555-1234');
+
+    await openCapture(tester);
+    await pickCustomer(tester, 'Ana Pérez');
+    await addOne(tester, 'Camisa');
+    await addOne(tester, 'Camisa');
+    await addOne(tester, 'Toalla grande');
+    await addOne(tester, 'Tina grande');
+
+    await tester.tap(find.text('Guardar pedido'));
+    await tester.pumpAndSettle();
+
+    // Lo que se comparte con el cliente: quién es, qué dejó y a qué hora.
+    final sheet = tester.widget<OrderSavedSheet>(find.byType(OrderSavedSheet));
+    expect(sheet.order.customerName, 'Ana Pérez');
+    expect(sheet.order.customerPhone, '5555-1234');
+    expect(sheet.order.customerNit, 'CF');
+    expect(sheet.order.receivedAt, isNotNull);
+    expect(sheet.order.garments, const [
+      (name: 'Camisa', quantity: 2),
+      (name: 'Toalla grande', quantity: 1),
+    ]);
+
+    // «Listo» es el que cierra el trámite y lleva el magenta; tomar otra boleta
+    // seguida es la excepción y va sin fondo.
+    AppButton button(String label) => tester.widget<AppButton>(
+      find.descendant(
+        of: find.byType(OrderSavedSheet),
+        matching: find.widgetWithText(AppButton, label),
+      ),
     );
-    expect(tester.widget<TextField>(nitField).controller?.text, '1234567-8');
+    expect(button('Listo').elevated, isTrue);
+    expect(button('Listo').variant, AppButtonVariant.primary);
+    expect(button('Nuevo pedido').variant, AppButtonVariant.ghost);
   });
 }

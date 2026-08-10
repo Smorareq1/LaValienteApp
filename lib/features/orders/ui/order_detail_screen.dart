@@ -18,6 +18,7 @@ import '../data/orders_repository.dart';
 import '../models/order.dart';
 import '../state/orders_controller.dart';
 import 'order_deliver_screen.dart';
+import 'order_services_screen.dart';
 import 'orders_screen.dart';
 import 'widgets/cancel_order_sheet.dart';
 import 'widgets/order_progress.dart';
@@ -199,19 +200,30 @@ class _DetailState extends ConsumerState<_Detail> {
     final locks = _locks();
     final status = order.status;
 
-    final canDeliver =
-        (status?.canBeDelivered ?? false) && !locks.today && _can(AppPermissions.ordersDeliver);
-    final canCollect = (status?.acceptsPayments ?? false) &&
+    // Aquí la pantalla ofrece **un solo paso**: el siguiente de la cadena del
+    // taller (§7.1). Recibido pasa a proceso, en proceso se marca listo, y hasta
+    // que la ropa está lista no aparecen cobrar ni entregar.
+    //
+    // Que el backend permita entregar desde cualquier estado vivo (plan 0001
+    // D13) sigue siendo cierto y sigue usándose: es Caja → Entregas y cobros
+    // (§7.1.1), con el cliente enfrente y sin recorrer la cadena. Esta pantalla
+    // es la del taller, donde la ropa va avanzando, y ofrecer los cuatro botones
+    // a la vez es cómo se entrega un pedido que todavía está en la lavadora.
+    final isReady = status == OrderStatus.ready;
+    final canDeliver = isReady && !locks.today && _can(AppPermissions.ordersDeliver);
+    // Un pedido entregado con saldo sigue aceptando cobros: así se salda un
+    // fiado, y es la única razón para volver a esta pantalla después.
+    final canCollect = (isReady || status == OrderStatus.delivered) &&
+        (status?.acceptsPayments ?? false) &&
         order.hasBalance &&
         !locks.today &&
         _can(AppPermissions.ordersCollectPayment);
 
-    // Entregar es la acción principal desde cualquier estado vivo (plan 0001
-    // D13). Marcar «en proceso» o «listo» sigue estando, pero abajo con las
-    // demás: es contabilidad opcional, y ponerla acá arriba volvería a sugerir
-    // que hay que darla antes de poder entregar.
+    final forward = status?.forwardStep;
     final (String, VoidCallback)? primary = canDeliver
         ? ('Entregar pedido', () => context.push(OrderDeliverScreen.pathFor(order.id)))
+        : forward != null && _can(AppPermissions.ordersUpdate)
+        ? (_forwardLabel(forward), () => _advance(forward))
         : null;
 
     return Stack(
@@ -1210,9 +1222,8 @@ class _AuditCard extends StatelessWidget {
   }
 }
 
-/// Corregir, anular y deshacer un paso: lo que no mueve el pedido hacia
-/// adelante vive aquí y no en la barra de abajo, para que la acción principal
-/// no compita con la de arreglar un error.
+/// Cómo se llama el paso siguiente de la cadena, que es la acción principal de
+/// la pantalla mientras la ropa no esté lista.
 String _forwardLabel(OrderStatus next) => switch (next) {
   OrderStatus.inProgress => 'Pasar a proceso',
   OrderStatus.ready => 'Marcar listo',
@@ -1220,6 +1231,9 @@ String _forwardLabel(OrderStatus next) => switch (next) {
   _ => 'Marcar ${next.label.toLowerCase()}',
 };
 
+/// Corregir, anular, sumar un servicio y deshacer un paso: lo que no mueve el
+/// pedido hacia adelante vive aquí y no en la barra de abajo, para que la acción
+/// principal no compita con la de arreglar un error.
 class _SecondaryActions extends StatelessWidget {
   const _SecondaryActions({
     required this.order,
@@ -1240,25 +1254,45 @@ class _SecondaryActions extends StatelessWidget {
     final status = order.status;
     if (status == null) return const SizedBox.shrink();
 
+    // Volver atrás existe para deshacer un toque equivocado, y va sin candado de
+    // fecha: mover la ropa por el taller no mueve el dinero de ningún día. El
+    // paso hacia adelante no está aquí — es la acción principal de la barra de
+    // abajo mientras la ropa no esté lista.
     final back = status.backStep;
-    // El paso hacia adelante de la cadena (§7.1). Vive acá abajo y no en la
-    // barra de acciones porque es opcional: sirve para saber qué hay en lavado,
-    // y entregar no lo exige. Va sin candado de fecha, igual que el de volver
-    // atrás: mover la ropa por el taller no mueve el dinero de ningún día.
-    final forward = status.forwardStep;
     // Corregir la boleta (§7.3). Un pedido `listo` pide además el permiso de
     // admin, y por eso son dos puertas y no una: el colaborador ve el botón
     // mientras el pedido está en el local, y deja de verlo cuando ya se lavó.
     final canEdit = status.canBeEdited && !locks.orderDay;
     final canCancel = status.canBeCancelled && !locks.orderDay;
 
-    if (!canEdit && !canCancel && back == null && forward == null) {
+    if (!canEdit && !canCancel && back == null) {
       return const SizedBox.shrink();
     }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        // Sumar un servicio a una boleta que ya está en el taller: el secado que
+        // se decide cuando la ropa ya entró (§5.4). Es la misma corrección que
+        // «Editar» y pide el mismo permiso, pero abre solo la lista del catálogo
+        // en vez de la boleta entera, que es lo que hace que se use.
+        if (canEdit)
+          PermissionGate(
+            anyOf: status.needsAdminToEdit
+                ? const [AppPermissions.ordersUpdateReady]
+                : const [AppPermissions.ordersUpdate],
+            child: Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: _QuietButton(
+                label: 'Agregar servicios',
+                icon: Icons.playlist_add_rounded,
+                iconColor: AppColors.secondary700,
+                onPressed: busy
+                    ? null
+                    : () => context.push(OrderServicesScreen.pathFor(order.id)),
+              ),
+            ),
+          ),
         if (canEdit || canCancel)
           Row(
             children: [
@@ -1294,19 +1328,6 @@ class _SecondaryActions extends StatelessWidget {
                   ),
                 ),
             ],
-          ),
-        if (forward != null)
-          Padding(
-            padding: const EdgeInsets.only(top: 8),
-            child: PermissionGate(
-              anyOf: const [AppPermissions.ordersUpdate],
-              child: _QuietButton(
-                label: _forwardLabel(forward),
-                icon: Icons.local_laundry_service_outlined,
-                iconColor: AppColors.secondary700,
-                onPressed: busy ? null : () => onAdvance(forward),
-              ),
-            ),
           ),
         if (back != null)
           Padding(

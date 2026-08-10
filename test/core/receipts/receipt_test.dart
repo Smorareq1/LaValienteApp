@@ -56,6 +56,49 @@ void main() {
       expect(text, isNot(contains('Anticipo')));
       expect(text, contains('Saldo pendiente: Q50.00'));
     });
+
+    test('lleva al cliente, sus datos, las prendas y la hora', () {
+      // Es el resguardo de lo que el cliente dejó: al recoger la ropa se cotejan
+      // las piezas y la hora, no el total.
+      final text = orderReceipt(
+        reference: 'No. 42',
+        total: 8500,
+        paid: 0,
+        date: '8 ago 2026',
+        time: '14:35',
+        customerName: 'Ana Pérez',
+        customerPhone: '5555-1234',
+        customerNit: 'CF',
+        garments: const [
+          (name: 'Camisa', quantity: 2),
+          (name: 'Toalla grande', quantity: 1),
+        ],
+      );
+
+      expect(text, contains('Recibido: 8 ago 2026, 14:35'));
+      expect(text, contains('Cliente: Ana Pérez'));
+      expect(text, contains('Tel: 5555-1234'));
+      expect(text, contains('NIT: CF'));
+      expect(text, contains('Prendas (3 piezas):'));
+      expect(text, contains('2 × Camisa'));
+      expect(text, contains('1 × Toalla grande'));
+    });
+
+    test('sin datos del cliente ni prendas no inventa renglones', () {
+      // El comprobante de una boleta que se guardó sin teléfono no puede decir
+      // "Tel:" a secas, y sin hora vuelve a hablar de la fecha del pedido.
+      final text = orderReceipt(
+        reference: 'No. 7',
+        total: 5000,
+        paid: 0,
+        date: '8 ago 2026',
+      );
+
+      expect(text, contains('Fecha: 8 ago 2026'));
+      expect(text, isNot(contains('Tel:')));
+      expect(text, isNot(contains('NIT:')));
+      expect(text, isNot(contains('Prendas')));
+    });
   });
 
   group('comprobante de venta', () {

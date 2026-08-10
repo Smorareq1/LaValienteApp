@@ -103,7 +103,14 @@ class DeliverySelection extends _$DeliverySelection {
     };
   }
 
-  void clear() => state = const {};
+  /// Desmarca las boletas que ya salieron. Lo demás se queda marcado: es lo que
+  /// hay que reintentar, y volver a buscarlo en la lista sería trabajo de más.
+  void forget(Iterable<String> orderIds) {
+    if (orderIds.isEmpty) return;
+    final next = Map<String, DeliveryLine>.from(state)
+      ..removeWhere((id, _) => orderIds.contains(id));
+    state = next;
+  }
 }
 
 /// Lo marcado, en el orden en que aparece la lista y ya sumado.
@@ -112,21 +119,15 @@ DeliveryBatch deliveryBatch(Ref ref) {
   final selection = ref.watch(deliverySelectionProvider);
   if (selection.isEmpty) return const DeliveryBatch([]);
 
-  // Se recorre la lista abierta y no el mapa para que la hoja del lote salga en
-  // el mismo orden que la pantalla: quien marcó cuatro boletas de arriba abajo
-  // espera encontrarlas así, no en el orden en que las fue tocando.
+  // Se recorre la lista abierta y no el mapa por dos razones. Una: la hoja del
+  // lote sale en el mismo orden que la pantalla, y quien marcó cuatro boletas de
+  // arriba abajo espera encontrarlas así. Dos: una boleta que dejó de estar
+  // abierta —se entregó desde el detalle, o desde otro teléfono— desaparece de
+  // la lista y tiene que desaparecer también de lo marcado. Un pedido ya
+  // entregado no vuelve a ofrecerse para entregar.
   final orders = ref.watch(openOrdersProvider).valueOrNull ?? const <OrderListItem>[];
-  final ordered = [
+  return DeliveryBatch([
     for (final order in orders)
       if (selection[order.id] case final line?) line,
-  ];
-
-  // Una boleta que dejó de estar abierta —la entregó otro teléfono mientras
-  // esta seguía marcada— desaparece de `orders` pero no del mapa. Se conserva
-  // para que el conteo no mienta; el intento de entregarla fallará con su
-  // mensaje, que es mejor que borrarla de la vista sin decir nada.
-  final missing = selection.keys.where(
-    (id) => ordered.every((line) => line.orderId != id),
-  );
-  return DeliveryBatch([...ordered, for (final id in missing) selection[id]!]);
+  ]);
 }

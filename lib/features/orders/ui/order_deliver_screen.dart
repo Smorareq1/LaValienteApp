@@ -97,6 +97,9 @@ class _OrderDeliverScreenState extends ConsumerState<OrderDeliverScreen> {
       appBar: AppBar(
         backgroundColor: AppColors.white,
         surfaceTintColor: AppColors.white,
+        // El tema pinta los iconos en blanco, que es lo correcto sobre el
+        // magenta; sobre blanco hay que decirlo o la flecha desaparece.
+        foregroundColor: AppColors.textPrimary,
         leading: IconButton(
           onPressed: () => context.pop(),
           icon: const Icon(Icons.arrow_back_rounded),

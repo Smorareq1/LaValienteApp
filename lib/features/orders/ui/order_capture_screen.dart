@@ -138,6 +138,26 @@ class _OrderCaptureScreenState extends ConsumerState<OrderCaptureScreen> {
     }
   }
 
+  /// Vaciar la boleta pregunta antes.
+  ///
+  /// El botón vive al pie de la lista, justo donde cae el pulgar al terminar de
+  /// contar prendas, y lo que borra es una boleta entera que no está guardada en
+  /// ninguna parte. La confirmación no es ceremonia: es lo que separa un toque
+  /// distraído de volver a preguntarle todo al cliente.
+  Future<void> _askClear() async {
+    final confirmed = await AppConfirmDialog.show(
+      context: context,
+      title: '¿Limpiar la boleta?',
+      message: 'Se borra todo lo capturado —cliente, prendas, servicios y '
+          'descuentos— y no se puede recuperar.',
+      confirmLabel: 'Limpiar',
+      cancelLabel: 'Seguir capturando',
+      destructive: true,
+      icon: Icons.delete_outline_rounded,
+    );
+    if (confirmed && mounted) _clearForm();
+  }
+
   Future<void> _save() async {
     final result = await ref
         .read(orderCaptureControllerProvider(widget.orderId).notifier)
@@ -218,7 +238,7 @@ class _OrderCaptureScreenState extends ConsumerState<OrderCaptureScreen> {
                 discountDescription: _discountDescription,
                 advance: _advance,
                 reference: _reference,
-                onClear: _clearForm,
+                onClear: _askClear,
               ),
             ),
           ),
@@ -551,33 +571,7 @@ class _Form extends ConsumerWidget {
                   ),
                 ],
               ),
-              const SizedBox(height: 12),
-              const CaptureLabel('NIT'),
-              Row(
-                children: [
-                  Expanded(
-                    child: AppTextField(
-                      key: const ValueKey('nit-field'),
-                      controller: nit,
-                      hintText: 'CF',
-                      onChanged: controller.setNit,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  _CfButton(
-                    onPressed: () {
-                      nit.text = 'CF';
-                      controller.setNit('CF');
-                    },
-                  ),
-                ],
-              ),
-              const SizedBox(height: 6),
-              Text(
-                'Se prellena con el del cliente y se puede cambiar.',
-                style: AppTypography.helper.copyWith(fontSize: 11.5),
-              ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 10),
               Text(
                 'El peso queda ligado al cargo «Lavado por peso» de la sección 5.',
                 style: AppTypography.helper.copyWith(fontSize: 11.5),
@@ -588,20 +582,58 @@ class _Form extends ConsumerWidget {
         CaptureSection(
           step: 2,
           title: 'Cliente',
-          summary: state.customer?.fullName ?? 'Sin cliente seleccionado',
+          summary: _customerSummary(state),
           incomplete: state.customer == null,
           expanded: expanded.contains(2),
           onToggle: () => onToggle(2),
-          child: CustomerPicker(
-            customer: state.customer,
-            onChanged: (customer) {
-              controller.setCustomer(customer);
-              // El NIT del cliente entra al campo del encabezado si estaba
-              // vacío: es el mismo dato y volver a teclearlo es trabajo de más.
-              if (customer?.nit != null && nit.text.trim().isEmpty) {
-                nit.text = customer!.nit!;
-              }
-            },
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              CustomerPicker(
+                customer: state.customer,
+                onChanged: (customer) {
+                  controller.setCustomer(customer);
+                  // El NIT sale del cliente: el suyo si lo tiene registrado y
+                  // `CF` si no, que es lo que se factura a quien no lo da. Al
+                  // soltar al cliente se va con él, porque un NIT huérfano es
+                  // una factura a nombre de quien no vino.
+                  nit.text = customer == null
+                      ? ''
+                      : OrderCaptureController.nitOf(customer);
+                },
+              ),
+              // El NIT vive con el cliente y no en el encabezado: es un dato
+              // *de él*, y enseñarlo antes de saber quién es deja un campo que
+              // no se sabe a quién pertenece.
+              if (state.customer != null) ...[
+                const SizedBox(height: 14),
+                const CaptureLabel('NIT'),
+                Row(
+                  children: [
+                    Expanded(
+                      child: AppTextField(
+                        key: const ValueKey('nit-field'),
+                        controller: nit,
+                        hintText: 'CF',
+                        onChanged: controller.setNit,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    _CfButton(
+                      onPressed: () {
+                        nit.text = 'CF';
+                        controller.setNit('CF');
+                      },
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'Sale del cliente: el suyo, o CF si no tiene. Se puede cambiar.',
+                  style: AppTypography.helper.copyWith(fontSize: 11.5),
+                ),
+              ],
+            ],
           ),
         ),
         CaptureSection(
@@ -817,6 +849,15 @@ class _Form extends ConsumerWidget {
         '${Fixed2.format(state.weightLbs!)} lbs',
     ];
     return parts.join(' · ');
+  }
+
+  /// El cliente con el NIT que se le va a facturar: los dos viven en esta
+  /// sección, y con ella cerrada es lo único que hay que revisar de un vistazo.
+  static String _customerSummary(OrderCaptureState state) {
+    final customer = state.customer;
+    if (customer == null) return 'Sin cliente seleccionado';
+    final nit = state.nit.trim();
+    return nit.isEmpty ? customer.fullName : '${customer.fullName} · NIT $nit';
   }
 
   static String _garmentSummary(OrderCaptureState state) {

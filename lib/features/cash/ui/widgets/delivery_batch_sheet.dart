@@ -63,11 +63,10 @@ class _DeliveryBatchSheetState extends ConsumerState<DeliveryBatchSheet> {
     if (!mounted) return;
 
     // Solo se desmarca lo que sí salió: lo que falló se queda marcado para
-    // volver a intentarlo sin buscarlo otra vez en la lista.
-    final selection = ref.read(deliverySelectionProvider.notifier);
-    if (outcome.isClean) {
-      selection.clear();
-    }
+    // volver a intentarlo sin buscarlo otra vez en la lista. Y se desmarca
+    // aunque el lote no haya salido limpio, porque una boleta ya entregada no
+    // puede seguir contando entre las marcadas.
+    ref.read(deliverySelectionProvider.notifier).forget(outcome.deliveredIds);
 
     setState(() => _saving = false);
     Navigator.of(context).pop(outcome);

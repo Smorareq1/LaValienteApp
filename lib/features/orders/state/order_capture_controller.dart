@@ -3,6 +3,7 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../core/errors/app_failure.dart';
 import '../../../core/money/fixed2.dart';
+import '../../../core/receipts/receipt.dart';
 import '../../../core/time/business_date.dart';
 import '../../auth/state/auth_controller.dart';
 import '../../catalog/data/catalog_repository.dart';
@@ -180,6 +181,17 @@ class OrderCaptureState {
           quantity: entry.value,
           notes: _clean(garmentNotes[entry.key]),
         ),
+  ];
+
+  /// Las prendas con su nombre, para el comprobante que se comparte (§17.1).
+  ///
+  /// Van en el orden del catálogo y no en el que se fueron tocando: el cliente
+  /// coteja el mensaje contra la boleta de papel, donde las prendas están
+  /// impresas en ese orden.
+  List<ReceiptGarment> get receiptGarments => [
+    for (final kind in garmentTypes)
+      if ((garmentQuantities[kind.id] ?? 0) > 0)
+        (name: kind.name, quantity: garmentQuantities[kind.id]!),
   ];
 
   /// Las promociones marcadas primero y el descuento manual al final, que es el
@@ -572,12 +584,28 @@ class OrderCaptureController extends _$OrderCaptureController {
 
   void setCustomer(Customer? customer) {
     _update((current) {
-      if (customer == null) return current.copyWith(clearCustomer: true);
-      // El NIT del cliente se prellena solo si el campo está vacío: quien ya
-      // escribió uno distinto lo hizo a propósito (§3.1).
-      final nit = current.nit.trim().isEmpty ? (customer.nit ?? '') : current.nit;
-      return current.copyWith(customer: customer, nit: nit);
+      // Soltar al cliente se lleva su NIT: el campo solo existe en la sección
+      // del cliente (§3.2), y un NIT que sobrevive al dueño es el que se cuela
+      // en la boleta del siguiente.
+      if (customer == null) {
+        return current.copyWith(clearCustomer: true, nit: '');
+      }
+      // El NIT sale del cliente, siempre: el suyo si lo tiene registrado y `CF`
+      // si no, que es lo que se factura a quien no da NIT. Elegir a otro cliente
+      // trae el de ese cliente en vez de dejar el anterior, porque un NIT que se
+      // quedó del cliente pasado es una factura a nombre de quien no vino.
+      // Cambiarlo a mano sigue siendo posible: manda lo último que se toca.
+      return current.copyWith(customer: customer, nit: nitOf(customer));
     });
+  }
+
+  /// El NIT con el que se factura a [customer]: el suyo, o `CF`.
+  ///
+  /// Vive aquí y no en la pantalla porque los dos lo necesitan —el estado y el
+  /// campo de texto de la sección del cliente— y tienen que decir lo mismo.
+  static String nitOf(Customer customer) {
+    final nit = customer.nit?.trim();
+    return nit == null || nit.isEmpty ? 'CF' : nit;
   }
 
   void setBookletSerial(String value) =>
@@ -723,10 +751,11 @@ class OrderCaptureController extends _$OrderCaptureController {
       );
     }
 
+    final capture = current.toCapture();
     final result = await ref
         .read(ordersRepositoryProvider)
         .create(
-          capture: current.toCapture(),
+          capture: capture,
           priced: current.priced,
           receivedById: user.id,
         );
@@ -736,6 +765,16 @@ class OrderCaptureController extends _$OrderCaptureController {
     _update((latest) => latest.copyWith(saving: false));
     if (result.isRight()) clear();
 
-    return result;
+    // El comprobante se arma con lo que había en pantalla y no con lo guardado:
+    // el repositorio solo tiene ids, y volver a leer el pedido para poner los
+    // nombres de las prendas sería una consulta para decir algo que ya se sabe.
+    return result.map(
+      (saved) => saved.withTicket(
+        customerName: current.customer?.fullName,
+        customerPhone: current.customer?.phone,
+        customerNit: capture.nit,
+        garments: current.receiptGarments,
+      ),
+    );
   }
 }

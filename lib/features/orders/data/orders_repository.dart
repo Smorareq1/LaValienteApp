@@ -101,6 +101,7 @@ class OrdersRepository {
         total: priced.total,
         paid: capture.advancePayment?.amount ?? 0,
         warnings: priced.warnings,
+        receivedAt: capturedAt,
       ),
     );
   }

@@ -122,6 +122,8 @@ class _PriceFormSheetState extends ConsumerState<PriceFormSheet> {
       ),
       child: ListView(
         shrinkWrap: true,
+        // El scroll lo hace la sheet; ver AppBottomSheetScaffold.
+        physics: const NeverScrollableScrollPhysics(),
         padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
         children: [
           if (current != null) ...[

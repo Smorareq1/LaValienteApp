@@ -108,6 +108,8 @@ class _GarmentFormSheetState extends ConsumerState<GarmentFormSheet> {
       ),
       child: ListView(
         shrinkWrap: true,
+        // El scroll lo hace la sheet; ver AppBottomSheetScaffold.
+        physics: const NeverScrollableScrollPhysics(),
         padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
         children: [
           AppFormField(

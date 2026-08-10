@@ -8,6 +8,13 @@ import '../tokens/app_typography.dart';
 ///
 /// Se abre con [show] para que todas las sheets compartan el mismo alto
 /// máximo, el ajuste al teclado y el radio superior.
+///
+/// **El scroll lo hace esta scaffold**, así que [child] no debe traer el suyo:
+/// un `ListView` adentro se queda con el gesto de arrastre —gana el scrollable
+/// de adentro— y como con `shrinkWrap` ya viene del alto exacto de su contenido,
+/// no tiene nada que desplazar. Resultado: la sheet no rueda y lo que quedó
+/// abajo del pliegue es inalcanzable. Si el contenido necesita ser una lista, va
+/// con `physics: NeverScrollableScrollPhysics()`.
 class AppBottomSheetScaffold extends StatelessWidget {
   const AppBottomSheetScaffold({
     super.key,
