@@ -7,6 +7,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../core/errors/app_failure.dart';
+import '../../sync/state/sync_engine.dart';
 import '../data/inventory_remote_datasource.dart';
 import '../data/product_image_cache.dart';
 import '../models/product.dart';
@@ -71,13 +72,22 @@ class InventoryAdminController extends _$InventoryAdminController {
   Future<Either<AppFailure, void>> recordMovement(MovementInput input) =>
       _guard(() => ref.read(inventoryRemoteDataSourceProvider).recordMovement(input));
 
-  /// Escribe y deja las lecturas locales marcadas como viejas.
+  /// Escribe arriba y **espera al feed** antes de dar la escritura por hecha.
   ///
-  /// El espejo se pone al día con el siguiente feed, no aquí: esto solo obliga a
-  /// releerlo para que una pantalla abierta no se quede con la cifra de antes.
+  /// Estas pantallas leen del espejo local, así que lo que se acaba de guardar
+  /// no existe para ellas hasta que baja por el feed. Sin este ciclo el producto
+  /// recién dado de alta no aparecía: había que ir a Sincronizar y volver, y la
+  /// pantalla mientras tanto decía que no había nada — que es exactamente lo que
+  /// dice cuando algo falló.
+  ///
+  /// El ciclo se espera en vez de lanzarse al aire para que la sheet siga
+  /// mostrando su spinner hasta que la fila esté en disco; al cerrarse, la lista
+  /// de atrás ya la tiene. `sync` no lanza: un corte de red deja el producto
+  /// guardado arriba y la pantalla al día en el siguiente ciclo.
   Future<Either<AppFailure, T>> _guard<T>(Future<T> Function() body) async {
     try {
       final result = await body();
+      await ref.read(syncEngineProvider.notifier).sync(reason: 'alta de inventario');
       ref.invalidate(inventoryProductsProvider);
       ref.invalidate(productDetailProvider);
       return Right(result);

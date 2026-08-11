@@ -9,6 +9,7 @@ import 'package:la_valiente/features/inventory/models/product.dart';
 import 'package:la_valiente/features/inventory/ui/widgets/lot_form_sheet.dart';
 import 'package:la_valiente/features/inventory/ui/widgets/movement_form_sheet.dart';
 import 'package:la_valiente/features/inventory/ui/widgets/product_form_sheet.dart';
+import 'package:la_valiente/features/sync/state/sync_engine.dart';
 
 /// El servidor de inventario, de mentira. Los tres sheets del §8.3–§8.5 van en
 /// línea, así que lo que hay que fingir es la red.
@@ -66,14 +67,34 @@ const _lot = ProductLot(
   salePrice: 2500,
 );
 
+/// El motor de sincronización, quieto y contando.
+///
+/// Guardar en línea pide un ciclo para que el espejo local vea lo que se acaba
+/// de crear —sin él la pantalla de atrás sigue sin el producto hasta que alguien
+/// sincroniza a mano—. Aquí no hay ni base de datos ni servidor detrás del
+/// motor, así que se finge; lo que sí importa es que se le pida.
+class _IdleSyncEngine extends SyncEngine {
+  static int cycles = 0;
+
+  @override
+  SyncEngineState build() => const SyncEngineState();
+
+  @override
+  Future<void> sync({String reason = 'a mano'}) async => cycles++;
+}
+
 Future<void> _open(WidgetTester tester, _FakeRemote remote, Widget sheet) async {
   tester.view.physicalSize = const Size(400, 1600);
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.reset);
+  _IdleSyncEngine.cycles = 0;
 
   await tester.pumpWidget(
     ProviderScope(
-      overrides: [inventoryRemoteDataSourceProvider.overrideWithValue(remote)],
+      overrides: [
+        inventoryRemoteDataSourceProvider.overrideWithValue(remote),
+        syncEngineProvider.overrideWith(_IdleSyncEngine.new),
+      ],
       child: MaterialApp(home: Scaffold(body: sheet)),
     ),
   );
@@ -88,10 +109,14 @@ Future<void> _openOnPhone(WidgetTester tester, _FakeRemote remote) async {
   tester.view.physicalSize = const Size(360, 640);
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.reset);
+  _IdleSyncEngine.cycles = 0;
 
   await tester.pumpWidget(
     ProviderScope(
-      overrides: [inventoryRemoteDataSourceProvider.overrideWithValue(remote)],
+      overrides: [
+        inventoryRemoteDataSourceProvider.overrideWithValue(remote),
+        syncEngineProvider.overrideWith(_IdleSyncEngine.new),
+      ],
       child: MaterialApp(
         home: Scaffold(
           body: Builder(
@@ -182,6 +207,10 @@ void main() {
       final sent = remote.lots.single;
       expect(sent.quantityReceived, 1200);
       expect(sent.expense!.total, 21600);
+      // Y se pide un ciclo: el lote vive arriba y la estantería se lee del
+      // espejo local, así que sin esto la compra no aparece hasta que alguien
+      // vaya a Sincronizar y vuelva.
+      expect(_IdleSyncEngine.cycles, 1);
     });
 
     testWidgets('sin precio de venta el lote es de la casa', (tester) async {

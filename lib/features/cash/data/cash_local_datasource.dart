@@ -73,12 +73,19 @@ class CashLocalDataSource {
   ) {
     final reference = order == null ? null : orderReference(order.dailyNumber);
     final who = customerName ?? 'Cliente sin sincronizar';
+    // La serie de imprenta va en la fila junto al correlativo: el papel que
+    // alguien tiene en la mano al repasar la caja lleva ese número y no el
+    // nuestro, y buscar una entrega sin él es leer la lista entera.
+    final serial = order?.bookletSerial;
 
     return CashEntry(
       id: payment.id,
       kind: CashEntryKind.orderPayment,
       title: reference == null ? who : 'Pedido $reference · $who',
-      subtitle: payment.isAdvance ? 'Anticipo' : 'Abono al pedido',
+      subtitle: [
+        payment.isAdvance ? 'Anticipo' : 'Abono al pedido',
+        if (serial != null && serial.isNotEmpty) 'boleta $serial',
+      ].join(' · '),
       amount: Fixed2.parse(payment.amount) ?? 0,
       method: PaymentMethod.fromWire(payment.method),
       at: payment.paidAt,

@@ -39,7 +39,7 @@ class DeliveryTicketSheet extends ConsumerStatefulWidget {
 
 class _DeliveryTicketSheetState extends ConsumerState<DeliveryTicketSheet> {
   late final TextEditingController _amount = TextEditingController(
-    text: Fixed2.format(widget.order.balance),
+    text: Fixed2.format(widget.order.balance > 0 ? widget.order.balance : 0),
   );
   final TextEditingController _reference = TextEditingController();
 
@@ -50,7 +50,12 @@ class _DeliveryTicketSheetState extends ConsumerState<DeliveryTicketSheet> {
   PaymentMethod _method = PaymentMethod.cash;
   String? _error;
 
-  int get _balance => widget.order.balance;
+  /// El saldo, nunca en negativo: una boleta que dejó de más no tiene saldo,
+  /// tiene [_credit].
+  int get _balance => widget.order.balance > 0 ? widget.order.balance : 0;
+
+  /// Lo que hay que devolverle: dejó un anticipo mayor de lo que costó.
+  int get _credit => widget.order.balance < 0 ? -widget.order.balance : 0;
 
   /// Lo que paga ahora: el saldo entero, o lo tecleado si pagó una parte.
   int get _amountNow => _partial ? (Fixed2.parse(_amount.text) ?? 0) : _balance;
@@ -65,7 +70,9 @@ class _DeliveryTicketSheetState extends ConsumerState<DeliveryTicketSheet> {
   }
 
   void _confirm() {
-    final amount = _amountNow;
+    // Cero cuando ya dejó de más: lo que sobra se le devuelve en la mano y no
+    // hay pago que registrar. El repositorio no manda un pago de Q0.
+    final amount = _credit > 0 ? 0 : _amountNow;
     if (amount > _balance) {
       // El vuelto no es un pago: cobrar Q100 contra un saldo de Q75 pondría
       // veinticinco quetzales en los libros que nunca se quedaron en la caja.
@@ -115,9 +122,14 @@ class _DeliveryTicketSheetState extends ConsumerState<DeliveryTicketSheet> {
             flex: 2,
             child: AppButton(
               // El botón dice qué va a pasar con el dinero, no «Confirmar»:
-              // entregar con saldo y cobrar completo son dos cosas distintas y
-              // la diferencia se lee justo antes de tocarlo.
-              label: _pending > 0 ? 'Entregar con saldo' : 'Cobrar y entregar',
+              // entregar con saldo, devolver lo que sobró y cobrar completo son
+              // tres cosas distintas, y la diferencia se lee justo antes de
+              // tocarlo.
+              label: _credit > 0
+                  ? 'Devolver y entregar'
+                  : _pending > 0
+                  ? 'Entregar con saldo'
+                  : 'Cobrar y entregar',
               icon: const Icon(Icons.check_rounded),
               fullWidth: true,
               elevated: true,
@@ -131,77 +143,84 @@ class _DeliveryTicketSheetState extends ConsumerState<DeliveryTicketSheet> {
         children: [
           _Figures(order: order),
           const SizedBox(height: 16),
-          Text('¿CUÁNTO PAGÓ?', style: AppTypography.label),
-          const SizedBox(height: 7),
-          AppSegmented<bool>(
-            value: _partial,
-            options: const [
-              AppSegmentedOption(
-                value: false,
-                label: 'Pagó todo',
-                icon: Icons.check_circle_outline_rounded,
-              ),
-              AppSegmentedOption(
-                value: true,
-                label: 'Queda debiendo',
-                icon: Icons.schedule_rounded,
+          // Una boleta que dejó de más no tiene nada que cobrar: preguntar
+          // «¿cuánto pagó?» sobre un saldo de cero es ofrecer un paso que no
+          // existe, y lo que hace falta decir es cuánto se le devuelve.
+          if (_credit > 0)
+            _CreditNote(credit: _credit)
+          else ...[
+            Text('¿CUÁNTO PAGÓ?', style: AppTypography.label),
+            const SizedBox(height: 7),
+            AppSegmented<bool>(
+              value: _partial,
+              options: const [
+                AppSegmentedOption(
+                  value: false,
+                  label: 'Pagó todo',
+                  icon: Icons.check_circle_outline_rounded,
+                ),
+                AppSegmentedOption(
+                  value: true,
+                  label: 'Queda debiendo',
+                  icon: Icons.schedule_rounded,
+                ),
+              ],
+              onChanged: (partial) => setState(() {
+                _partial = partial;
+                _error = null;
+                // Al pasar a «queda debiendo» el campo arranca en el saldo, que
+                // es desde donde se baja: nadie teclea un abono desde cero.
+                if (partial) _amount.text = Fixed2.format(_balance);
+              }),
+            ),
+            if (_partial) ...[
+              const SizedBox(height: 14),
+              AppFormField(
+                label: 'PAGA AHORA',
+                controller: _amount,
+                hintText: 'Q 0.00',
+                errorText: _error,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                inputFormatters: decimalInputFormatters,
+                onChanged: (_) => setState(() => _error = null),
               ),
             ],
-            onChanged: (partial) => setState(() {
-              _partial = partial;
-              _error = null;
-              // Al pasar a «queda debiendo» el campo arranca en el saldo, que es
-              // desde donde se baja: nadie teclea un abono desde cero.
-              if (partial) _amount.text = Fixed2.format(_balance);
-            }),
-          ),
-          if (_partial) ...[
             const SizedBox(height: 14),
-            AppFormField(
-              label: 'PAGA AHORA',
-              controller: _amount,
-              hintText: 'Q 0.00',
-              errorText: _error,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              inputFormatters: decimalInputFormatters,
-              onChanged: (_) => setState(() => _error = null),
+            Text('¿CÓMO PAGÓ?', style: AppTypography.label),
+            const SizedBox(height: 7),
+            AppSegmented<PaymentMethod>(
+              value: _method,
+              options: const [
+                AppSegmentedOption(
+                  value: PaymentMethod.cash,
+                  label: 'Efectivo',
+                  icon: Icons.payments_outlined,
+                ),
+                AppSegmentedOption(
+                  value: PaymentMethod.transfer,
+                  label: 'Transferencia',
+                  icon: Icons.swap_horiz_rounded,
+                ),
+              ],
+              onChanged: (method) => setState(() => _method = method),
             ),
-          ],
-          const SizedBox(height: 14),
-          Text('¿CÓMO PAGÓ?', style: AppTypography.label),
-          const SizedBox(height: 7),
-          AppSegmented<PaymentMethod>(
-            value: _method,
-            options: const [
-              AppSegmentedOption(
-                value: PaymentMethod.cash,
-                label: 'Efectivo',
-                icon: Icons.payments_outlined,
-              ),
-              AppSegmentedOption(
-                value: PaymentMethod.transfer,
-                label: 'Transferencia',
-                icon: Icons.swap_horiz_rounded,
+            if (_method == PaymentMethod.transfer) ...[
+              const SizedBox(height: 14),
+              AppFormField(
+                label: 'REFERENCIA',
+                controller: _reference,
+                hintText: 'No. de la transferencia',
+                optional: true,
               ),
             ],
-            onChanged: (method) => setState(() => _method = method),
-          ),
-          if (_method == PaymentMethod.transfer) ...[
-            const SizedBox(height: 14),
-            AppFormField(
-              label: 'REFERENCIA',
-              controller: _reference,
-              hintText: 'No. de la transferencia',
-              optional: true,
+            const SizedBox(height: 16),
+            _Result(
+              entering: _amountNow,
+              pending: _pending,
+              method: _method,
+              blocked: blocked,
             ),
           ],
-          const SizedBox(height: 16),
-          _Result(
-            entering: _amountNow,
-            pending: _pending,
-            method: _method,
-            blocked: blocked,
-          ),
         ],
       ),
     );
@@ -231,7 +250,10 @@ class _Figures extends StatelessWidget {
             _Line(label: 'Anticipos', amount: order.paid),
           ],
           const Divider(height: 18),
-          _Line(label: 'Saldo', amount: order.balance, strong: true),
+          if (order.balance < 0)
+            _Line(label: 'A favor', amount: -order.balance, strong: true)
+          else
+            _Line(label: 'Saldo', amount: order.balance, strong: true),
           const SizedBox(height: 5),
           Align(
             alignment: Alignment.centerLeft,
@@ -270,6 +292,61 @@ class _Line extends StatelessWidget {
           size: strong ? AppMoneySize.lg : AppMoneySize.md,
         ),
       ],
+    );
+  }
+}
+
+/// La boleta dejó más de lo que costó: al entregarla se devuelve la diferencia.
+///
+/// Se dice con la cifra y no con un «ya está pagada» porque lo que hace falta en
+/// el mostrador es saber cuántos quetzales sacar del cajón.
+class _CreditNote extends StatelessWidget {
+  const _CreditNote({required this.credit});
+
+  final int credit;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 11),
+      decoration: BoxDecoration(
+        color: AppColors.secondary50,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(
+            Icons.reply_rounded,
+            size: 17,
+            color: AppColors.secondary700,
+          ),
+          const SizedBox(width: 9),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Hay que devolverle Q${Fixed2.format(credit)}',
+                  style: AppTypography.bodySm.copyWith(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.secondary700,
+                  ),
+                ),
+                Text(
+                  'Dejó de anticipo más de lo que la boleta terminó costando. No '
+                  'entra nada a la caja: se le devuelve la diferencia.',
+                  style: AppTypography.helper.copyWith(
+                    fontSize: 11.5,
+                    color: AppColors.secondary700,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

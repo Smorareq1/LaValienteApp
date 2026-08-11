@@ -167,7 +167,12 @@ class _OrderDeliverScreenState extends ConsumerState<OrderDeliverScreen> {
               const SizedBox(height: 6),
               _Line(label: 'Pagado', amount: order.paid),
               const Divider(height: 20),
-              _Line(label: 'Saldo', amount: order.balance, strong: true),
+              // Un anticipo mayor que el total no es un saldo negativo: es
+              // dinero del cliente que se le devuelve al entregarle la ropa.
+              if (order.balance < 0)
+                _Line(label: 'A favor', amount: -order.balance, strong: true)
+              else
+                _Line(label: 'Saldo', amount: order.balance, strong: true),
               if (_payment != null) ...[
                 const SizedBox(height: 10),
                 Container(
@@ -228,14 +233,20 @@ class _OrderDeliverScreenState extends ConsumerState<OrderDeliverScreen> {
     final blocked = remaining > 0 && !canLend;
 
     return AppSummaryBar(
-      total: Fixed2.toDouble(remaining),
-      totalLabel: remaining > 0 ? 'QUEDA DEBIENDO' : 'SALDO',
+      total: Fixed2.toDouble(remaining < 0 ? -remaining : remaining),
+      totalLabel: remaining > 0
+          ? 'QUEDA DEBIENDO'
+          : remaining < 0
+          ? 'A DEVOLVER'
+          : 'SALDO',
       caption: '${order.garments.length} tipos de prenda',
       actionLabel: 'Confirmar entrega',
       note: blocked
           ? 'Queda saldo pendiente: solo un administrador puede entregar fiado.'
           : remaining > 0
           ? 'Se entrega con Q${Fixed2.format(remaining)} pendientes.'
+          : remaining < 0
+          ? 'Dejó de más: hay que devolverle Q${Fixed2.format(-remaining)}.'
           : null,
       noteIsWarning: true,
       busy: _saving,

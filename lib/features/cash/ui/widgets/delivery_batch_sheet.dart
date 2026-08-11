@@ -35,6 +35,11 @@ class _DeliveryBatchSheetState extends ConsumerState<DeliveryBatchSheet> {
   bool _saving = false;
 
   Future<void> _editPayment(DeliveryLine line) async {
+    // Una boleta que dejó de más no tiene nada que cobrar; lo suyo es un vuelto,
+    // y la fila ya lo dice. Abrir la hoja de cobro sobre un saldo negativo solo
+    // podría terminar en un error.
+    if (line.credit > 0) return;
+
     final payment = await PaymentSheet.show(
       context,
       balance: line.balance,
@@ -147,6 +152,15 @@ class _DeliveryBatchSheetState extends ConsumerState<DeliveryBatchSheet> {
               AppMoneyText(Fixed2.toDouble(batch.collected), size: AppMoneySize.lg),
             ],
           ),
+          if (batch.credit > 0) ...[
+            const SizedBox(height: 12),
+            _Notice(
+              tone: _Tone.info,
+              title: 'Hay Q${Fixed2.format(batch.credit)} que devolver',
+              message: 'Alguna de estas boletas dejó de anticipo más de lo que '
+                  'terminó costando. Esa diferencia sale del cajón al entregarla.',
+            ),
+          ],
           if (batch.hasPending) ...[
             const SizedBox(height: 12),
             _Notice(
@@ -200,7 +214,12 @@ class _LineRow extends StatelessWidget {
                   borderRadius: BorderRadius.circular(6),
                 ),
                 child: Text(
-                  line.label,
+                  // Los dos números: el correlativo con el que la app la
+                  // nombra y la serie que lleva escrita el papel.
+                  [
+                    line.reference,
+                    if (line.bookletSerial != null) line.bookletSerial!,
+                  ].join(' · '),
                   style: AppTypography.helper.copyWith(
                     fontSize: 10,
                     fontWeight: FontWeight.w800,
@@ -222,17 +241,25 @@ class _LineRow extends StatelessWidget {
               ),
               const SizedBox(width: 8),
               Material(
-                color: line.isPartial ? AppColors.warningBg : AppColors.gray100,
+                color: line.credit > 0
+                    ? AppColors.secondary50
+                    : line.isPartial
+                    ? AppColors.warningBg
+                    : AppColors.gray100,
                 borderRadius: BorderRadius.circular(11),
                 child: InkWell(
-                  onTap: onEdit,
+                  onTap: line.credit > 0 ? null : onEdit,
                   borderRadius: BorderRadius.circular(11),
                   child: Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                     child: AppMoneyText(
-                      Fixed2.toDouble(line.amount),
+                      Fixed2.toDouble(line.credit > 0 ? line.credit : line.amount),
                       size: AppMoneySize.md,
-                      color: line.isPartial ? AppColors.warningText : AppColors.textPrimary,
+                      color: line.credit > 0
+                          ? AppColors.secondary700
+                          : line.isPartial
+                          ? AppColors.warningText
+                          : AppColors.textPrimary,
                     ),
                   ),
                 ),
@@ -244,12 +271,18 @@ class _LineRow extends StatelessWidget {
             children: [
               Expanded(
                 child: Text(
-                  line.isPartial
+                  line.credit > 0
+                      ? 'se le devuelve · dejó de más'
+                      : line.isPartial
                       ? 'pagó una parte · queda Q${Fixed2.format(line.pending)}'
                       : 'pagó todo · ${line.method.label.toLowerCase()}',
                   style: AppTypography.helper.copyWith(
                     fontSize: 11,
-                    color: line.isPartial ? AppColors.warningText : AppColors.textMuted,
+                    color: line.credit > 0
+                        ? AppColors.secondary700
+                        : line.isPartial
+                        ? AppColors.warningText
+                        : AppColors.textMuted,
                   ),
                 ),
               ),

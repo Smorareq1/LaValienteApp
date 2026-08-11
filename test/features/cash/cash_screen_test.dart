@@ -120,6 +120,53 @@ void main() {
         );
   }
 
+  /// Las categorías tal como bajan del feed, sin ningún gasto anotado: es lo
+  /// que la hoja de gasto necesita para poder clasificar uno.
+  Future<void> seedCategories() async {
+    await database
+        .into(database.expenseCategoryEntries)
+        .insert(
+          ExpenseCategoryEntriesCompanion.insert(
+            id: 'cat-gas',
+            name: 'Gas',
+            sortOrder: const Value(1),
+          ),
+        );
+    await database
+        .into(database.expenseCategoryEntries)
+        .insert(
+          ExpenseCategoryEntriesCompanion.insert(
+            id: 'cat-insumos',
+            name: 'Compra de insumos',
+            sortOrder: const Value(2),
+          ),
+        );
+  }
+
+  /// Un insumo con existencias y precio de venta, que es lo que la hoja de gasto
+  /// usa para valuar lo que se compró.
+  Future<void> seedProduct({
+    required String name,
+    required String salePrice,
+  }) async {
+    await database
+        .into(database.productEntries)
+        .insert(ProductEntriesCompanion.insert(id: 'prod-1', name: name, unit: 'bolsa'));
+    await database
+        .into(database.productLotEntries)
+        .insert(
+          ProductLotEntriesCompanion.insert(
+            id: 'lote-1',
+            productId: 'prod-1',
+            lotNumber: 1,
+            quantityReceived: '10.00',
+            quantityAvailable: '10.00',
+            salePrice: Value(salePrice),
+            receivedAt: today,
+          ),
+        );
+  }
+
   Future<void> seedExpense({
     required String amount,
     String concept = 'Gas — 2 sacos',
@@ -152,11 +199,30 @@ void main() {
 
   /// Una boleta abierta con una prenda y sin anticipo: lo que la lista de
   /// entregas de Caja tiene que encontrar. Se queda en `received` a propósito.
+  ///
+  /// [advance] deja además un anticipo, que puede pasarse del total: el cliente
+  /// paga antes de que se sepa qué tratamientos va a necesitar su ropa.
   Future<void> seedOpenOrder({
     required String id,
     required String serial,
     required String name,
+    String? advance,
   }) async {
+    if (advance != null) {
+      await database
+          .into(database.orderPaymentEntries)
+          .insert(
+            OrderPaymentEntriesCompanion.insert(
+              id: 'anticipo-$id',
+              orderId: id,
+              amount: advance,
+              method: 'cash',
+              isAdvance: const Value(true),
+              receivedById: 'u1',
+              paidAt: businessDate().toUtc().add(const Duration(hours: 16)),
+            ),
+          );
+    }
     await database
         .into(database.customerEntries)
         .insert(
@@ -301,6 +367,80 @@ void main() {
     });
   });
 
+  group('anotar un gasto', () {
+    /// La sheet leía las categorías con un `read` justo al abrirse, y un stream
+    /// que acaba de nacer todavía no ha emitido: llegaban siempre vacías. La
+    /// sheet decía que el teléfono no las había bajado y el botón de registrar
+    /// no hacía nada, con las categorías ahí en la base.
+    cashTest('las categorías del teléfono se ofrecen al abrir la hoja', (
+      tester,
+    ) async {
+      await seedCategories();
+      await openCash(tester);
+
+      await tester.tap(find.widgetWithText(AppButton, 'Gasto'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Registrar gasto'), findsOneWidget);
+      expect(find.widgetWithText(AppChip, 'Gas'), findsOneWidget);
+      expect(find.widgetWithText(AppChip, 'Compra de insumos'), findsOneWidget);
+      expect(
+        find.textContaining('todavía no bajó las categorías'),
+        findsNothing,
+      );
+    });
+
+    cashTest('sin categorías el botón de registrar queda apagado', (
+      tester,
+    ) async {
+      await openCash(tester);
+
+      await tester.tap(find.widgetWithText(AppButton, 'Gasto'));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('todavía no bajó las categorías'), findsOneWidget);
+      final registrar = tester.widget<AppButton>(
+        find.widgetWithText(AppButton, 'Registrar'),
+      );
+      expect(registrar.onPressed, isNull);
+    });
+
+    /// El mostrador cuenta botes, no escribe montos: tres detergentes son tres
+    /// toques y el concepto y el total salen solos, como las prendas de una
+    /// boleta.
+    cashTest('los insumos se cuentan y llenan el concepto y el monto', (
+      tester,
+    ) async {
+      await seedCategories();
+      await seedProduct(name: 'Detergente', salePrice: '12.50');
+      await openCash(tester);
+
+      await tester.tap(find.widgetWithText(AppButton, 'Gasto'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('INSUMOS · opcional'));
+      await tester.pumpAndSettle();
+      expect(find.text('Q12.50 el bolsa'), findsOneWidget);
+
+      final more = find.descendant(
+        of: find.byType(AppStepper),
+        matching: find.byIcon(Icons.add_rounded),
+      );
+      for (var i = 0; i < 3; i++) {
+        await tester.tap(more);
+        await tester.pumpAndSettle();
+      }
+
+      expect(find.text('3 Detergente'), findsOneWidget);
+      expect(find.text('37.50'), findsOneWidget);
+      // Y la categoría se mueve sola a la que le toca: es una compra de insumos.
+      final supplies = tester.widget<AppChip>(
+        find.widgetWithText(AppChip, 'Compra de insumos'),
+      );
+      expect(supplies.selected, isTrue);
+    });
+  });
+
   group('candado de fecha', () {
     cashTest('una fecha cerrada muestra el candado y apaga las acciones', (
       tester,
@@ -365,6 +505,41 @@ void main() {
 
       // Y ya no está entre las pendientes: entregada es entregada.
       expect(find.text('No queda ropa pendiente de entregar.'), findsOneWidget);
+    });
+
+    /// La boleta que dejó de más se entrega devolviendo la diferencia. Antes la
+    /// hoja arrancaba con el saldo negativo en «paga ahora» y confirmar moría
+    /// con «el monto no puede ser negativo»: la ropa no se podía entregar.
+    cashTest('una boleta con anticipo de más se entrega devolviendo el vuelto', (
+      tester,
+    ) async {
+      await seedOpenOrder(
+        id: 'p-1',
+        serial: 'B-000144',
+        name: 'Sonia Pérez',
+        advance: '100.00',
+      );
+      await openCash(tester);
+
+      // En la fila no hay saldo que cobrar, hay vuelto que dar.
+      expect(find.text('a favor'), findsOneWidget);
+
+      await tester.tap(find.text('Sonia Pérez'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Hay que devolverle Q20.00'), findsOneWidget);
+      expect(find.text('¿CUÁNTO PAGÓ?'), findsNothing);
+
+      await tester.tap(find.widgetWithText(AppButton, 'Devolver y entregar'));
+      await tester.pumpAndSettle();
+
+      final order = await (database.select(
+        database.orderEntries,
+      )..where((row) => row.id.equals('p-1'))).getSingle();
+      expect(order.status, 'delivered');
+      // Y no se inventó un cobro de cero para poder entregarla.
+      final payments = await database.select(database.orderPaymentEntries).get();
+      expect(payments.single.id, 'anticipo-p-1');
     });
 
     cashTest('el cliente que paga una parte queda entregado con saldo', (tester) async {

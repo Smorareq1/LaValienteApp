@@ -513,6 +513,9 @@ class _DeliveriesCardState extends ConsumerState<_DeliveriesCard> {
         'Entregada la ${line.label}',
         if (outcome.collected > 0) '+Q${Fixed2.format(outcome.collected)} en caja',
         if (line.isPartial) 'queda debiendo Q${Fixed2.format(line.pending)}',
+        // Lo que se le devolvió también se dice: es dinero que salió del cajón
+        // y quien acaba de entregarla tiene que poder confirmar que lo hizo.
+        if (line.credit > 0) 'se le devolvieron Q${Fixed2.format(line.credit)}',
       ].join(' · '),
     );
   }
@@ -734,9 +737,12 @@ class _OpenOrderRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // La serie de imprenta es como la llama el mostrador; el correlativo es el
-    // último recurso, para una boleta sin serie o que todavía no subió.
-    final label = order.bookletSerial ?? order.reference;
+    // Los dos números, no uno: la serie de imprenta es como la llama el
+    // mostrador —es la que está escrita en el papel que el cliente trae— y el
+    // correlativo es por el que la busca quien repasa el día en la app. Enseñar
+    // solo la serie obligaba a abrir la boleta para saber cuál era.
+    final serial = order.bookletSerial;
+    final credit = order.balance < 0 ? -order.balance : 0;
 
     return InkWell(
       onTap: onTap,
@@ -778,21 +784,11 @@ class _OpenOrderRow extends StatelessWidget {
                 children: [
                   Row(
                     children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: AppColors.gray100,
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Text(
-                          label,
-                          style: AppTypography.helper.copyWith(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w800,
-                            color: AppColors.textSecondary,
-                          ),
-                        ),
-                      ),
+                      _TicketBadge(label: order.reference),
+                      if (serial != null && serial.isNotEmpty) ...[
+                        const SizedBox(width: 5),
+                        _TicketBadge(label: serial),
+                      ],
                       const SizedBox(width: 7),
                       Expanded(
                         child: Text(
@@ -823,17 +819,52 @@ class _OpenOrderRow extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.end,
               mainAxisSize: MainAxisSize.min,
               children: [
-                AppMoneyText(order.balanceAsDouble, size: AppMoneySize.md),
+                // Una boleta que dejó de más no tiene saldo negativo: tiene un
+                // vuelto que dar. Pintar «-Q20 saldo» haría que el mostrador
+                // buscara veinte quetzales que nadie debe.
+                AppMoneyText(
+                  Fixed2.toDouble(credit > 0 ? credit : order.balance),
+                  size: AppMoneySize.md,
+                  color: credit > 0 ? AppColors.secondary700 : null,
+                ),
                 Text(
-                  'saldo',
+                  credit > 0 ? 'a favor' : 'saldo',
                   style: AppTypography.helper.copyWith(
                     fontSize: 9.5,
                     fontWeight: FontWeight.w700,
+                    color: credit > 0 ? AppColors.secondary700 : null,
                   ),
                 ),
               ],
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// El número de una boleta, en pastilla. Van dos por fila: el correlativo del
+/// día y la serie de imprenta, que casi nunca coinciden y se buscan por igual.
+class _TicketBadge extends StatelessWidget {
+  const _TicketBadge({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: AppColors.gray100,
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Text(
+        label,
+        style: AppTypography.helper.copyWith(
+          fontSize: 10,
+          fontWeight: FontWeight.w800,
+          color: AppColors.textSecondary,
         ),
       ),
     );
@@ -1137,11 +1168,8 @@ class _ExpenseCard extends ConsumerWidget {
       return;
     }
 
-    final categories =
-        ref.read(cashExpensesCategoriesProvider).valueOrNull ?? const <ExpenseCategory>[];
     final draft = await ExpenseSheet.show(
       context,
-      categories: categories,
       date: ref.read(cashDateFilterProvider),
       initial: expense,
     );
@@ -1272,12 +1300,9 @@ class _CashFooter extends ConsumerWidget {
 
   Future<void> _addExpense(BuildContext context, WidgetRef ref) async {
     final user = ref.read(authControllerProvider).valueOrNull;
-    final categories =
-        ref.read(cashExpensesCategoriesProvider).valueOrNull ?? const <ExpenseCategory>[];
 
     final draft = await ExpenseSheet.show(
       context,
-      categories: categories,
       date: ref.read(cashDateFilterProvider),
     );
     if (draft == null || user == null || !context.mounted) return;

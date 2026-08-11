@@ -66,6 +66,10 @@ String orderReceipt({
     if (paid > 0) 'Anticipo: Q${Fixed2.format(paid)}',
     if (balance > 0)
       'Saldo pendiente: Q${Fixed2.format(balance)}'
+    // Lo que dejó de más queda impreso: es la prueba que el cliente se lleva de
+    // que al recoger su ropa le toca un vuelto de esa cantidad.
+    else if (balance < 0)
+      'A favor: Q${Fixed2.format(-balance)} (se devuelve al entregar)'
     else
       'Pagado por completo',
     '',

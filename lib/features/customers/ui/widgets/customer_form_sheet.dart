@@ -188,7 +188,9 @@ class _CustomerFormSheetState extends ConsumerState<CustomerFormSheet> {
           AppFormField(
             label: 'NIT',
             controller: _nit,
-            hintText: '1234567-8',
+            // Sin guion: el ejemplo con guion se copiaba tal cual y el NIT
+            // quedaba escrito de dos maneras distintas según quién lo tecleara.
+            hintText: '12345678',
             optional: true,
             prefixIcon: const Icon(Icons.receipt_long_outlined),
             textInputAction: TextInputAction.next,

@@ -124,6 +124,19 @@ class OrderCaptureState {
 
   int get advanceAmount => Fixed2.parse(advanceAmountText) ?? 0;
 
+  /// Lo que el cliente deja **de más**, en centavos.
+  ///
+  /// Existe porque en el mostrador se cobra antes de saber el trabajo: cuando la
+  /// ropa entra nadie sabe todavía qué tratamientos va a necesitar, así que el
+  /// cliente deja Q100 sobre una boleta que a lo mejor termina en Q80. Los Q20
+  /// se devuelven al entregar, y hasta entonces la boleta los muestra a favor en
+  /// vez de fingir un saldo de cero.
+  int get advanceCredit {
+    final paid = (editing?.paid ?? 0) + advanceAmount;
+    final over = paid - priced.total;
+    return over > 0 ? over : 0;
+  }
+
   /// Las líneas tal como se mandarían, en el orden del catálogo.
   List<ChargeDraft> get charges {
     final drafts = <ChargeDraft>[];
@@ -240,29 +253,15 @@ class OrderCaptureState {
     if (totalPieces == 0) missing.add('las prendas');
     if (priced.charges.isEmpty) missing.add('un cargo');
 
-    final issues = [
+    // Un anticipo mayor que el total **no** bloquea, y una corrección que deje
+    // el pedido por debajo de lo ya cobrado tampoco: el mostrador cobra antes de
+    // saber qué tratamientos va a necesitar la ropa, así que lo de más es lo
+    // normal y se devuelve al entregar. Lo que sobra se dice con
+    // [advanceCredit], que la pantalla enseña como saldo a favor.
+    return [
       if (missing.isNotEmpty) 'Falta ${_join(missing)} para guardar.',
       ...priced.blockers,
     ];
-
-    final advance = Fixed2.parse(advanceAmountText);
-    if (advance != null && advance > priced.total) {
-      // El vuelto que se da en el mostrador no es dinero que se quedó en la
-      // caja; el servidor rechaza el pago y aquí se dice antes de mandarlo.
-      issues.add('El anticipo no puede ser mayor que el total.');
-    }
-
-    final paid = editing?.paid ?? 0;
-    if (paid > priced.total) {
-      // Corregir hacia abajo un pedido ya cobrado es una devolución, y devolver
-      // dinero es un movimiento de caja que todavía no existe (§7.3).
-      issues.add(
-        'Ya se cobraron Q${Fixed2.format(paid)}: el pedido no puede quedar en '
-        'Q${Fixed2.format(priced.total)}.',
-      );
-    }
-
-    return issues;
   }
 
   bool get canSave => blockers.isEmpty && !saving;

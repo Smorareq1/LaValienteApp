@@ -21,13 +21,17 @@ class DeliveryLine {
   });
 
   /// Arranca en «pagó todo», que es el caso normal.
+  ///
+  /// Una boleta que ya dejó más de lo que costó arranca en cero y no en su
+  /// saldo: el saldo es negativo y cobrar menos veinte no es un movimiento de
+  /// caja. Lo que hay que devolverle vive en [credit].
   factory DeliveryLine.of(OrderListItem order) => DeliveryLine(
     orderId: order.id,
     reference: order.reference,
     customerName: order.customerName,
     bookletSerial: order.bookletSerial,
     balance: order.balance,
-    amount: order.balance,
+    amount: order.balance > 0 ? order.balance : 0,
     method: PaymentMethod.cash,
   );
 
@@ -54,6 +58,10 @@ class DeliveryLine {
   int get pending => balance - amount;
 
   bool get isPartial => pending > 0;
+
+  /// Lo que hay que devolverle al cliente al entregar, en centavos: dejó un
+  /// anticipo mayor que lo que la boleta terminó costando.
+  int get credit => balance < 0 ? -balance : 0;
 
   /// Cómo se nombra en pantalla: la serie si la tiene, si no el correlativo.
   String get label => bookletSerial ?? reference;
@@ -83,13 +91,22 @@ class DeliveryBatch {
   bool get isEmpty => lines.isEmpty;
 
   /// Saldo total de las boletas marcadas, antes de tocar los montos.
-  int get balance => lines.fold(0, (sum, line) => sum + line.balance);
+  ///
+  /// Las que dejaron de más suman cero y no en negativo: un anticipo sobrante de
+  /// una boleta no cancela la deuda de otra, y sumarlos daría un total que no es
+  /// ni lo que hay por cobrar ni lo que hay por devolver.
+  int get balance =>
+      lines.fold(0, (sum, line) => sum + (line.balance > 0 ? line.balance : 0));
 
   /// Lo que entra a la caja con los montos como están.
   int get collected => lines.fold(0, (sum, line) => sum + line.amount);
 
   /// Lo que se entrega fiado.
-  int get pending => balance - collected;
+  int get pending =>
+      lines.fold(0, (sum, line) => sum + (line.isPartial ? line.pending : 0));
+
+  /// Lo que hay que devolver entre todas.
+  int get credit => lines.fold(0, (sum, line) => sum + line.credit);
 
   bool get hasPending => pending > 0;
 

@@ -9,8 +9,6 @@ import '../../../core/time/business_date.dart';
 import '../../auth/state/auth_controller.dart';
 import '../../auth/ui/widgets/permission_gate.dart';
 import '../../cash/data/expenses_repository.dart';
-import '../../cash/models/expense.dart';
-import '../../cash/state/cash_day_controller.dart';
 import '../../cash/ui/widgets/expense_sheet.dart';
 import '../../shell/ui/widgets/gradient_header.dart';
 import '../data/attendance_repository.dart';
@@ -468,15 +466,11 @@ class _OvertimeCta extends ConsumerWidget {
   }
 
   Future<void> _pay(BuildContext context, WidgetRef ref) async {
-    final categories =
-        ref.read(cashExpensesCategoriesProvider).valueOrNull ??
-        const <ExpenseCategory>[];
     final user = ref.read(authControllerProvider).valueOrNull;
     if (user == null) return;
 
     final draft = await ExpenseSheet.show(
       context,
-      categories: categories,
       date: date,
       prefill: OvertimePrefill(
         employeeId: day.employee.id,

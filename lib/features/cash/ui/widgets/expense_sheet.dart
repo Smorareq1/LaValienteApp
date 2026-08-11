@@ -2,14 +2,19 @@ import 'package:design_system/design_system.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/database/search_text.dart';
 import '../../../../core/money/fixed2.dart';
 import '../../../../core/money/payment_method.dart';
 import '../../../../core/time/business_date.dart';
+import '../../../inventory/models/product.dart';
+import '../../../inventory/state/shelf_controller.dart';
 import '../../../staff/domain/overtime.dart';
 import '../../../staff/models/staff.dart';
 import '../../../staff/state/attendance_controller.dart';
+import '../../../sync/state/sync_engine.dart';
 import '../../data/expenses_repository.dart';
 import '../../models/expense.dart';
+import '../../state/cash_day_controller.dart';
 
 /// Anotar un gasto, o corregir uno ya anotado (Plan 0006 §7.2).
 ///
@@ -17,10 +22,15 @@ import '../../models/expense.dart';
 /// destiempo: alguien pagó el gas ayer y lo anota hoy. El servidor rechaza la de
 /// un día ya cerrado, así que el calendario no deja pasar de hoy y la pantalla
 /// de Caja ya bloquea el botón cuando la fecha que se está mirando está cerrada.
+///
+/// Las categorías **se observan aquí** y no llegan por parámetro: son un stream
+/// de la BD local y quien abría la sheet las leía con un `read`, que devuelve
+/// «cargando» en el mismo instante en que se pide. Esa lectura era siempre vacía
+/// y la sheet abría diciendo que el teléfono no las había bajado, con el botón
+/// de registrar sin nada que hacer.
 class ExpenseSheet extends ConsumerStatefulWidget {
   const ExpenseSheet({
     super.key,
-    required this.categories,
     required this.date,
     this.initial,
     this.prefill,
@@ -35,7 +45,9 @@ class ExpenseSheet extends ConsumerStatefulWidget {
   /// se sigue pudiendo anotar a mano — se degrada, no se rompe.
   static const String overtimeCategoryName = 'Horas extra';
 
-  final List<ExpenseCategory> categories;
+  /// Dónde se anota la compra de insumos, por el mismo mecanismo y con el mismo
+  /// riesgo asumido: `SUPPLY_PURCHASE_CATEGORY` en `expenses/models.py`.
+  static const String suppliesCategoryName = 'Compra de insumos';
 
   /// El día que la Caja está mirando; con el que abre el formulario.
   final DateTime date;
@@ -49,7 +61,6 @@ class ExpenseSheet extends ConsumerStatefulWidget {
   /// Abre la sheet y devuelve lo capturado, o `null` si se canceló.
   static Future<ExpenseDraft?> show(
     BuildContext context, {
-    required List<ExpenseCategory> categories,
     required DateTime date,
     Expense? initial,
     OvertimePrefill? prefill,
@@ -57,7 +68,6 @@ class ExpenseSheet extends ConsumerStatefulWidget {
     return AppBottomSheetScaffold.show<ExpenseDraft>(
       context: context,
       builder: (context) => ExpenseSheet(
-        categories: categories,
         date: date,
         initial: initial,
         prefill: prefill,
@@ -108,8 +118,12 @@ class _ExpenseSheetState extends ConsumerState<ExpenseSheet> {
 
   late DateTime _date =
       parseIsoDate(widget.initial?.expenseDate ?? '') ?? widget.date;
-  late String? _categoryId =
-      widget.initial?.categoryId ?? _overtimeCategoryId() ?? _firstCategoryId();
+
+  /// La categoría **elegida a mano**. Nula mientras nadie toque un chip: cuál se
+  /// usa entonces lo decide [_resolvedCategory], que necesita la lista y por eso
+  /// no se puede fijar aquí — cuando la sheet abre todavía no ha llegado.
+  late String? _categoryId = widget.initial?.categoryId;
+
   late PaymentMethod _method = widget.initial?.method ?? PaymentMethod.cash;
   late bool _isPending = widget.initial?.isPending ?? false;
 
@@ -119,9 +133,22 @@ class _ExpenseSheetState extends ConsumerState<ExpenseSheet> {
   late String? _recordId =
       widget.initial?.attendanceRecordId ?? widget.prefill?.attendanceRecordId;
 
+  /// Unidades por producto: los insumos que esta compra trae (§8.1).
+  final Map<String, int> _units = {};
+
+  /// Si el concepto y el monto los escribió una persona. Mientras no, los pone
+  /// la cuenta de insumos; después de que alguien los toque no se pisan, por lo
+  /// mismo que el monto de una hora extra no se pisa (D8).
+  ///
+  /// Un gasto que se está corrigiendo, o el pago que llega resuelto desde la
+  /// asistencia, nacen tocados: esas cifras ya las decidió alguien.
+  late bool _conceptTouched = widget.initial != null || widget.prefill != null;
+  late bool _amountTouched = _conceptTouched;
+
+  bool _suppliesOpen = false;
+
   String? _conceptError;
   String? _amountError;
-  bool _categoryMissing = false;
   bool _employeeMissing = false;
 
   bool get _isEditing => widget.initial != null;
@@ -133,30 +160,42 @@ class _ExpenseSheetState extends ConsumerState<ExpenseSheet> {
     return suggested == null ? '' : Fixed2.format(suggested);
   }
 
-  String? _firstCategoryId() =>
-      widget.categories.isEmpty ? null : widget.categories.first.id;
+  /// La categoría que el formulario está usando ahora mismo.
+  ///
+  /// El orden es el de lo que se sabe con más certeza: lo que alguien eligió, lo
+  /// que el gasto ya decía, lo que la compra de insumos o el pago de una jornada
+  /// implican, y por último la primera de la lista.
+  ExpenseCategory? _resolvedCategory(List<ExpenseCategory> categories) {
+    if (categories.isEmpty) return null;
 
-  /// Solo cuando el pago viene de la asistencia: es la categoría que le
-  /// corresponde y preseleccionarla ahorra el paso obvio.
-  String? _overtimeCategoryId() {
-    if (widget.prefill == null) return null;
-    for (final category in widget.categories) {
-      if (category.name == ExpenseSheet.overtimeCategoryName) return category.id;
+    ExpenseCategory? byId(String? id) {
+      if (id == null) return null;
+      for (final category in categories) {
+        if (category.id == id) return category;
+      }
+      return null;
     }
-    return null;
+
+    ExpenseCategory? byName(String name) {
+      for (final category in categories) {
+        if (category.name == name) return category;
+      }
+      return null;
+    }
+
+    return byId(_categoryId) ??
+        (_units.isEmpty ? null : byName(ExpenseSheet.suppliesCategoryName)) ??
+        (widget.prefill == null
+            ? null
+            : byName(ExpenseSheet.overtimeCategoryName)) ??
+        categories.first;
   }
 
   /// El bloque de hora extra se muestra por la categoría elegida, no por cómo se
   /// abrió la sheet: anotar el pago de una jornada desde la Caja es tan válido
   /// como hacerlo desde la asistencia.
-  bool get _isOvertime {
-    for (final category in widget.categories) {
-      if (category.id == _categoryId) {
-        return category.name == ExpenseSheet.overtimeCategoryName;
-      }
-    }
-    return false;
-  }
+  bool _isOvertime(ExpenseCategory? category) =>
+      category?.name == ExpenseSheet.overtimeCategoryName;
 
   @override
   void dispose() {
@@ -166,21 +205,21 @@ class _ExpenseSheetState extends ConsumerState<ExpenseSheet> {
     super.dispose();
   }
 
-  void _confirm() {
+  void _confirm(List<ExpenseCategory> categories) {
+    final category = _resolvedCategory(categories);
+    final overtime = _isOvertime(category);
     final concept = _concept.text.trim();
     final amount = Fixed2.parse(_amount.text) ?? 0;
-    final categoryId = _categoryId;
 
     setState(() {
       _conceptError = concept.isEmpty ? 'Escribí en qué se gastó' : null;
       _amountError = amount <= 0 ? 'Escribí cuánto se gastó' : null;
-      _categoryMissing = categoryId == null;
       // El servidor lo exige: una jornada se le paga a alguien.
-      _employeeMissing = _isOvertime && _employeeId == null;
+      _employeeMissing = overtime && _employeeId == null;
     });
     if (_conceptError != null ||
         _amountError != null ||
-        categoryId == null ||
+        category == null ||
         _employeeMissing) {
       return;
     }
@@ -188,14 +227,14 @@ class _ExpenseSheetState extends ConsumerState<ExpenseSheet> {
     Navigator.of(context).pop(
       ExpenseDraft(
         expenseDate: isoDate(_date),
-        categoryId: categoryId,
+        categoryId: category.id,
         concept: concept,
         amount: amount,
         method: _method,
         status: _isPending ? ExpenseStatus.pending : ExpenseStatus.paid,
         observations: _observations.text,
-        employeeId: _isOvertime ? _employeeId : null,
-        attendanceRecordId: _isOvertime ? _recordId : null,
+        employeeId: overtime ? _employeeId : null,
+        attendanceRecordId: overtime ? _recordId : null,
       ),
     );
   }
@@ -229,9 +268,47 @@ class _ExpenseSheetState extends ConsumerState<ExpenseSheet> {
     });
   }
 
+  /// Suma y cuenta lo que la compra lleva: «3 Detergente · 2 Cloro», Q97.50.
+  void _setUnits(List<ProductSummary> products, String productId, int units) {
+    setState(() {
+      if (units <= 0) {
+        _units.remove(productId);
+      } else {
+        _units[productId] = units;
+        _suppliesOpen = true;
+      }
+
+      final chosen = [
+        for (final product in products)
+          if ((_units[product.id] ?? 0) > 0) product,
+      ];
+
+      if (!_conceptTouched) {
+        _concept.text = [
+          for (final product in chosen) '${_units[product.id]} ${product.name}',
+        ].join(' · ');
+        if (chosen.isNotEmpty) _conceptError = null;
+      }
+      if (!_amountTouched) {
+        final total = chosen.fold<int>(
+          0,
+          (sum, product) =>
+              sum + Fixed2.multiply(product.nextSalePrice ?? 0, _units[product.id]! * 100),
+        );
+        _amount.text = total <= 0 ? '' : Fixed2.format(total);
+        if (total > 0) _amountError = null;
+      }
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final today = businessDate();
+    final categoriesAsync = ref.watch(cashExpensesCategoriesProvider);
+    final categories = categoriesAsync.valueOrNull;
+    final category = _resolvedCategory(categories ?? const []);
+    final products =
+        ref.watch(inventoryProductsProvider()).valueOrNull ?? const <ProductSummary>[];
 
     return AppBottomSheetScaffold(
       title: _isEditing ? 'Corregir el gasto' : 'Registrar gasto',
@@ -256,7 +333,11 @@ class _ExpenseSheetState extends ConsumerState<ExpenseSheet> {
               icon: const Icon(Icons.check_rounded),
               fullWidth: true,
               elevated: true,
-              onPressed: _confirm,
+              // Sin categoría no hay gasto que mandar. El botón se apaga en vez
+              // de no hacer nada al tocarlo: el aviso de arriba dice qué falta.
+              onPressed: category == null
+                  ? null
+                  : () => _confirm(categories ?? const []),
             ),
           ),
         ],
@@ -278,32 +359,24 @@ class _ExpenseSheetState extends ConsumerState<ExpenseSheet> {
           const SizedBox(height: 14),
           Text('CATEGORÍA', style: AppTypography.label),
           const SizedBox(height: 7),
-          if (widget.categories.isEmpty)
+          if (categories == null)
+            const _LoadingCategories()
+          else if (categories.isEmpty)
             const _NoCategories()
           else
             Wrap(
               spacing: 7,
               runSpacing: 7,
               children: [
-                for (final category in widget.categories)
+                for (final option in categories)
                   AppChip(
-                    label: category.name,
-                    selected: category.id == _categoryId,
-                    onTap: () => setState(() {
-                      _categoryId = category.id;
-                      _categoryMissing = false;
-                    }),
+                    label: option.name,
+                    selected: option.id == category?.id,
+                    onTap: () => setState(() => _categoryId = option.id),
                   ),
               ],
             ),
-          if (_categoryMissing) ...[
-            const SizedBox(height: 6),
-            Text(
-              'Elegí la categoría',
-              style: AppTypography.helper.copyWith(color: AppColors.error),
-            ),
-          ],
-          if (_isOvertime) ...[
+          if (_isOvertime(category)) ...[
             const SizedBox(height: 14),
             _OvertimeBlock(
               date: _date,
@@ -314,12 +387,24 @@ class _ExpenseSheetState extends ConsumerState<ExpenseSheet> {
             ),
           ],
           const SizedBox(height: 14),
+          _SuppliesBlock(
+            products: products,
+            units: _units,
+            open: _suppliesOpen,
+            onToggle: () => setState(() => _suppliesOpen = !_suppliesOpen),
+            onChanged: (productId, units) =>
+                _setUnits(products, productId, units),
+          ),
+          const SizedBox(height: 14),
           AppFormField(
             label: 'CONCEPTO',
             controller: _concept,
             hintText: 'Gas — 2 sacos',
             errorText: _conceptError,
-            onChanged: (_) => setState(() => _conceptError = null),
+            onChanged: (_) => setState(() {
+              _conceptTouched = true;
+              _conceptError = null;
+            }),
           ),
           const SizedBox(height: 14),
           AppFormField(
@@ -329,7 +414,10 @@ class _ExpenseSheetState extends ConsumerState<ExpenseSheet> {
             errorText: _amountError,
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
             inputFormatters: decimalInputFormatters,
-            onChanged: (_) => setState(() => _amountError = null),
+            onChanged: (_) => setState(() {
+              _amountTouched = true;
+              _amountError = null;
+            }),
           ),
           const SizedBox(height: 14),
           Text('MÉTODO', style: AppTypography.label),
@@ -364,6 +452,218 @@ class _ExpenseSheetState extends ConsumerState<ExpenseSheet> {
             optional: true,
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Los insumos de la compra, con la misma cuenta que las prendas de una boleta.
+///
+/// El mostrador no escribe «Q97.50 de jabón»: cuenta botes. Se ponen 3
+/// detergentes y 2 cloros y el concepto y el monto salen solos, valuados al
+/// precio de venta que el teléfono conoce — que es el único precio que baja al
+/// dispositivo (el de compra no viaja en el feed, a propósito).
+///
+/// Va plegado mientras nadie lo abra: la mayoría de los gastos —el gas, la
+/// moto— no son insumos, y una lista de productos en medio del formulario
+/// estorbaría a quien solo viene a anotar Q200 de gas.
+class _SuppliesBlock extends StatefulWidget {
+  const _SuppliesBlock({
+    required this.products,
+    required this.units,
+    required this.open,
+    required this.onToggle,
+    required this.onChanged,
+  });
+
+  final List<ProductSummary> products;
+  final Map<String, int> units;
+  final bool open;
+  final VoidCallback onToggle;
+  final void Function(String productId, int units) onChanged;
+
+  /// Cuántos se ven antes de tener que buscar o desplegar el resto.
+  static const int visibleByDefault = 6;
+
+  @override
+  State<_SuppliesBlock> createState() => _SuppliesBlockState();
+}
+
+class _SuppliesBlockState extends State<_SuppliesBlock> {
+  String _query = '';
+  bool _showAll = false;
+
+  List<ProductSummary> get _visible {
+    final needle = normalizeForSearch(_query);
+    if (needle.isNotEmpty) {
+      return widget.products
+          .where((product) => normalizeForSearch(product.name).contains(needle))
+          .toList();
+    }
+    if (_showAll) return widget.products;
+
+    // Los que ya tienen cantidad no se pueden esconder: acortar la lista no
+    // puede ocultar lo que la persona ya contó.
+    final counted = widget.products
+        .where((product) => (widget.units[product.id] ?? 0) > 0)
+        .toList();
+    final rest = widget.products
+        .where((product) => (widget.units[product.id] ?? 0) == 0)
+        .take(_SuppliesBlock.visibleByDefault)
+        .toList();
+    return [...counted, ...rest];
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final counted = widget.units.values.fold(0, (sum, units) => sum + units);
+    final visible = _visible;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        InkWell(
+          onTap: widget.onToggle,
+          borderRadius: BorderRadius.circular(9),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  counted == 0
+                      ? 'INSUMOS · opcional'
+                      : 'INSUMOS · $counted ${counted == 1 ? 'unidad' : 'unidades'}',
+                  style: AppTypography.label,
+                ),
+              ),
+              Icon(
+                widget.open ? Icons.expand_less_rounded : Icons.expand_more_rounded,
+                size: 20,
+                color: AppColors.textSecondary,
+              ),
+            ],
+          ),
+        ),
+        if (!widget.open)
+          Text(
+            'Contá lo que compraste y el concepto y el monto se llenan solos.',
+            style: AppTypography.helper.copyWith(fontSize: 11.5),
+          )
+        else if (widget.products.isEmpty)
+          Padding(
+            padding: const EdgeInsets.only(top: 6),
+            child: Text(
+              'Este teléfono todavía no bajó los insumos. Sincronizá y volvé a '
+              'intentarlo, o escribí el gasto a mano.',
+              style: AppTypography.helper.copyWith(fontSize: 11.5),
+            ),
+          )
+        else ...[
+          const SizedBox(height: 4),
+          Text(
+            'Se valúan al precio de venta. Anota el gasto: el inventario se '
+            'mueve al registrar el lote.',
+            style: AppTypography.helper.copyWith(fontSize: 11.5),
+          ),
+          const SizedBox(height: 9),
+          if (widget.products.length > _SuppliesBlock.visibleByDefault) ...[
+            AppSearchField(
+              hintText: 'Buscar un insumo…',
+              backgroundColor: AppColors.gray100,
+              onChanged: (value) => setState(() => _query = value),
+            ),
+            const SizedBox(height: 9),
+          ],
+          if (visible.isEmpty)
+            Text(
+              'Ningún insumo con ese nombre.',
+              style: AppTypography.helper.copyWith(fontSize: 11.5),
+            ),
+          for (final product in visible)
+            _SupplyRow(
+              key: ValueKey(product.id),
+              product: product,
+              units: widget.units[product.id] ?? 0,
+              onChanged: (units) => widget.onChanged(product.id, units),
+            ),
+          if (_query.isEmpty &&
+              widget.products.length > _SuppliesBlock.visibleByDefault)
+            Center(
+              child: AppButton(
+                label: _showAll
+                    ? 'Ver solo los primeros'
+                    : 'Ver los ${widget.products.length} insumos',
+                variant: AppButtonVariant.ghost,
+                size: AppButtonSize.sm,
+                onPressed: () => setState(() => _showAll = !_showAll),
+              ),
+            ),
+        ],
+      ],
+    );
+  }
+}
+
+/// Un insumo con su precio y su contador, igual que una prenda de la boleta.
+class _SupplyRow extends StatelessWidget {
+  const _SupplyRow({
+    super.key,
+    required this.product,
+    required this.units,
+    required this.onChanged,
+  });
+
+  final ProductSummary product;
+  final int units;
+  final ValueChanged<int> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final price = product.nextSalePrice;
+    final counted = units > 0;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(12, 7, 9, 7),
+        decoration: BoxDecoration(
+          color: counted ? AppColors.primary50 : AppColors.gray50,
+          borderRadius: BorderRadius.circular(13),
+          border: Border.all(
+            color: counted ? AppColors.primary100 : AppColors.gray100,
+          ),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    product.name,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppTypography.bodySm.copyWith(
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.gray800,
+                    ),
+                  ),
+                  Text(
+                    // Sin precio el contador sigue sirviendo para el concepto,
+                    // pero el monto lo tiene que escribir una persona: inventarlo
+                    // sería poner una cifra que nadie pagó.
+                    price == null
+                        ? 'Sin precio · escribí el monto'
+                        : 'Q${Fixed2.format(price)} el ${product.unit}',
+                    style: AppTypography.helper.copyWith(fontSize: 11),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 10),
+            AppStepper(value: units, size: AppStepperSize.md, onChanged: onChanged),
+          ],
+        ),
       ),
     );
   }
@@ -539,24 +839,65 @@ class _PendingSwitch extends StatelessWidget {
   }
 }
 
-class _NoCategories extends StatelessWidget {
-  const _NoCategories();
+/// El stream de categorías todavía no dio su primer valor. Dura un parpadeo, y
+/// decirlo es lo que separa «esperá» de «este teléfono no las tiene».
+class _LoadingCategories extends StatelessWidget {
+  const _LoadingCategories();
 
   @override
   Widget build(BuildContext context) {
+    return Row(
+      children: [
+        const SizedBox(
+          width: 14,
+          height: 14,
+          child: CircularProgressIndicator(strokeWidth: 2),
+        ),
+        const SizedBox(width: 9),
+        Text(
+          'Buscando las categorías…',
+          style: AppTypography.helper.copyWith(color: AppColors.textSecondary),
+        ),
+      ],
+    );
+  }
+}
+
+/// No hay ninguna categoría en el dispositivo. Se administran en línea (D11), así
+/// que lo único que se puede hacer desde aquí es pedir un ciclo de
+/// sincronización — y por eso el aviso trae el botón en vez de mandar a buscarlo
+/// a otra pantalla.
+class _NoCategories extends ConsumerWidget {
+  const _NoCategories();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
     return Container(
       padding: const EdgeInsets.all(13),
       decoration: BoxDecoration(
         color: AppColors.warningBg,
         borderRadius: BorderRadius.circular(13),
       ),
-      child: Text(
-        'Este teléfono todavía no bajó las categorías de gasto. Sincronizá y '
-        'volvé a intentarlo.',
-        style: AppTypography.bodySm.copyWith(
-          fontSize: 12.5,
-          color: AppColors.warningText,
-        ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            'Este teléfono todavía no bajó las categorías de gasto. Sin ellas el '
+            'gasto no se puede clasificar.',
+            style: AppTypography.bodySm.copyWith(
+              fontSize: 12.5,
+              color: AppColors.warningText,
+            ),
+          ),
+          const SizedBox(height: 9),
+          AppButton(
+            label: 'Sincronizar ahora',
+            icon: const Icon(Icons.sync_rounded),
+            variant: AppButtonVariant.outline,
+            size: AppButtonSize.sm,
+            onPressed: () => ref.read(syncEngineProvider.notifier).sync(),
+          ),
+        ],
       ),
     );
   }

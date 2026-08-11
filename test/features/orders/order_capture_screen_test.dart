@@ -397,6 +397,39 @@ void main() {
     ]);
   });
 
+  /// En el mostrador se cobra antes de saber el trabajo: cuando la ropa entra
+  /// nadie sabe todavía qué tratamientos va a necesitar, así que el cliente deja
+  /// Q100 sobre una boleta que a lo mejor cierra en Q60. Bloquearlo obligaba a
+  /// mentir en el monto para poder guardar.
+  captureTest('un anticipo mayor que el total se guarda y queda a favor', (
+    tester,
+  ) async {
+    await seedCatalog();
+    await customers.create(fullName: 'Ana Pérez');
+
+    await openCapture(tester);
+    await pickCustomer(tester, 'Ana Pérez');
+    await addOne(tester, 'Camisa');
+    await addOne(tester, 'Tina grande');
+
+    await tester.tap(find.text('Pago inicial'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.widgetWithText(AppTextField, 'Q 0.00').last, '100');
+    await tester.pumpAndSettle();
+
+    // Ni bloquea ni se calla: dice cuánto quedó a favor y de qué se trata.
+    expect(find.textContaining('Deja Q70.00 de más'), findsOneWidget);
+    expect(find.textContaining('anticipo no puede ser mayor'), findsNothing);
+
+    await tester.tap(find.text('Guardar pedido'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Pedido guardado'), findsOneWidget);
+    final payment = (await database.select(database.orderPaymentEntries).get()).single;
+    expect(payment.amount, '100.00');
+    expect(payment.isAdvance, isTrue);
+  });
+
   /// El campo de NIT, que vive en la sección del cliente y solo existe cuando
   /// hay uno elegido.
   Finder nitField() => find.descendant(

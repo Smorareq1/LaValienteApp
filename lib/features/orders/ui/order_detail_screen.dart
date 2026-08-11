@@ -969,6 +969,10 @@ class _PaymentsCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final settled = order.balance <= 0;
+    // Lo que dejó de más. Se dice con su cifra y no como «pagado por completo»:
+    // son quetzales que hay que sacar del cajón al entregar, y el mostrador no
+    // puede enterarse de eso restando de cabeza.
+    final credit = order.balance < 0 ? -order.balance : 0;
 
     return _Card(
       title: 'Pagos',
@@ -985,29 +989,57 @@ class _PaymentsCard extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
             decoration: BoxDecoration(
-              color: settled ? AppColors.successBg : AppColors.errorBg,
+              color: credit > 0
+                  ? AppColors.secondary50
+                  : settled
+                  ? AppColors.successBg
+                  : AppColors.errorBg,
               borderRadius: BorderRadius.circular(13),
             ),
             child: Row(
               children: [
                 Text(
-                  settled ? 'Pagado por completo' : 'Saldo pendiente',
+                  credit > 0
+                      ? 'A favor del cliente'
+                      : settled
+                      ? 'Pagado por completo'
+                      : 'Saldo pendiente',
                   style: AppTypography.bodySm.copyWith(
                     fontSize: 12.5,
                     fontWeight: FontWeight.w800,
-                    color: settled ? AppColors.successText : const Color(0xFF912018),
+                    color: credit > 0
+                        ? AppColors.secondary700
+                        : settled
+                        ? AppColors.successText
+                        : const Color(0xFF912018),
                   ),
                 ),
                 const Spacer(),
                 AppMoneyText(
-                  Fixed2.toDouble(order.balance < 0 ? 0 : order.balance),
+                  Fixed2.toDouble(credit > 0 ? credit : order.balance),
                   size: AppMoneySize.lg,
-                  color: settled ? AppColors.successText : const Color(0xFF912018),
-                  decimalColor: settled ? AppColors.success : AppColors.error,
+                  color: credit > 0
+                      ? AppColors.secondary700
+                      : settled
+                      ? AppColors.successText
+                      : const Color(0xFF912018),
+                  decimalColor: credit > 0
+                      ? AppColors.secondary300
+                      : settled
+                      ? AppColors.success
+                      : AppColors.error,
                 ),
               ],
             ),
           ),
+          if (credit > 0) ...[
+            const SizedBox(height: 8),
+            Text(
+              'Dejó de anticipo más de lo que costó la boleta. Se le devuelve al '
+              'entregar.',
+              style: AppTypography.helper.copyWith(fontSize: 11.5),
+            ),
+          ],
         ],
       ),
     );
@@ -1432,6 +1464,7 @@ class _ActionBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final settled = order.balance <= 0;
+    final credit = order.balance < 0 ? -order.balance : 0;
 
     return Container(
       padding: const EdgeInsets.fromLTRB(14, 11, 14, 14),
@@ -1448,7 +1481,11 @@ class _ActionBar extends StatelessWidget {
           Row(
             children: [
               Text(
-                settled ? 'Pagado por completo' : 'Saldo pendiente',
+                credit > 0
+                    ? 'A favor del cliente'
+                    : settled
+                    ? 'Pagado por completo'
+                    : 'Saldo pendiente',
                 style: AppTypography.helper.copyWith(
                   fontSize: 11.5,
                   fontWeight: FontWeight.w700,
@@ -1457,10 +1494,18 @@ class _ActionBar extends StatelessWidget {
               ),
               const Spacer(),
               AppMoneyText(
-                Fixed2.toDouble(order.balance < 0 ? 0 : order.balance),
+                Fixed2.toDouble(credit > 0 ? credit : order.balance),
                 size: AppMoneySize.lg,
-                color: settled ? AppColors.successText : const Color(0xFF912018),
-                decimalColor: settled ? AppColors.success : AppColors.error,
+                color: credit > 0
+                    ? AppColors.secondary700
+                    : settled
+                    ? AppColors.successText
+                    : const Color(0xFF912018),
+                decimalColor: credit > 0
+                    ? AppColors.secondary300
+                    : settled
+                    ? AppColors.success
+                    : AppColors.error,
               ),
             ],
           ),

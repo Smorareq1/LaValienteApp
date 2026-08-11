@@ -837,10 +837,18 @@ class _Form extends ConsumerWidget {
                   ),
                 ],
                 const SizedBox(height: 10),
-                Text(
-                  'Normalmente se paga al entregar; el anticipo es la excepción.',
-                  style: AppTypography.helper.copyWith(fontSize: 11.5),
-                ),
+                if (state.advanceCredit > 0)
+                  CaptureNotice(
+                    message:
+                        'Deja Q${Fixed2.format(state.advanceCredit)} de más. La '
+                        'boleta queda con ese saldo a favor y se le devuelve al '
+                        'entregar.',
+                  )
+                else
+                  Text(
+                    'Normalmente se paga al entregar; el anticipo es la excepción.',
+                    style: AppTypography.helper.copyWith(fontSize: 11.5),
+                  ),
               ],
             ),
           ),
@@ -906,7 +914,11 @@ class _Form extends ConsumerWidget {
   static String _advanceSummary(OrderCaptureState state) {
     final amount = state.advanceAmount;
     if (amount <= 0) return 'No paga por adelantado';
-    return 'Q${Fixed2.format(amount)} · ${state.paymentMethod.label.toLowerCase()}';
+    final credit = state.advanceCredit;
+    return [
+      'Q${Fixed2.format(amount)} · ${state.paymentMethod.label.toLowerCase()}',
+      if (credit > 0) 'Q${Fixed2.format(credit)} a favor',
+    ].join(' · ');
   }
 }
 
